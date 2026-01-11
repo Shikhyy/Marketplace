@@ -1,7 +1,7 @@
 'use client';
 
 import { useEffect, useState, use } from 'react';
-import { usePrivy } from '@privy-io/react-auth';
+import { usePrivy, useWallets } from '@privy-io/react-auth';
 import { Loader2, Lock, Play, Pause, Volume2, Maximize, User, ShieldCheck, CheckCircle, AlertCircle, Share2, Wallet } from 'lucide-react';
 import Link from 'next/link';
 import { createPublicClient, http, formatEther } from 'viem';
@@ -32,7 +32,29 @@ const GATEWAY = NEXT_PUBLIC_IPFS_GATEWAY || "https://gateway.lighthouse.storage/
 export default function ContentPage(props: { params: Promise<{ id: string }> }) {
     const params = use(props.params);
     const { getAccessToken, authenticated, login, user } = usePrivy();
+    const { wallets } = useWallets();
     const { handlePayment, paymentState, loading: paymentLoading, error: paymentError } = useX402();
+
+    const addTokenToWallet = async () => {
+        if (!wallets?.[0]) return;
+        try {
+            const provider = await wallets[0].getEthereumProvider();
+            await provider.request({
+                method: 'wallet_watchAsset',
+                params: {
+                    type: 'ERC20',
+                    options: {
+                        address: USDC_SEPOLIA_ADDRESS,
+                        symbol: 'USDC',
+                        decimals: 6,
+                        image: 'https://cryptologos.cc/logos/usd-coin-usdc-logo.png?v=024',
+                    },
+                } as any,
+            });
+        } catch (error) {
+            console.error("Failed to add token", error);
+        }
+    };
 
     const [loading, setLoading] = useState(true);
     const [authorized, setAuthorized] = useState(false);
@@ -512,6 +534,14 @@ export default function ContentPage(props: { params: Promise<{ id: string }> }) 
                                                                     <ShieldCheck className="w-5 h-5 group-hover/btn:scale-110 transition-transform" />
                                                                 </>
                                                             )}
+                                                        </button>
+
+                                                        {/* Add Token Button */}
+                                                        <button
+                                                            onClick={addTokenToWallet}
+                                                            className="text-[10px] text-slate-500 hover:text-indigo-400 underline decoration-slate-700 underline-offset-4 transition-colors w-full text-center"
+                                                        >
+                                                            Don't see USDC? Add to Wallet
                                                         </button>
 
                                                         {paymentError && (

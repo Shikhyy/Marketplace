@@ -22,14 +22,14 @@ export default function Home() {
         <motion.div
           initial={{ opacity: 0, scale: 0.9 }}
           animate={{ opacity: 1, scale: 1 }}
-          transition={{ duration: 1, ease: "easeOut" }}
-          className="relative"
+          transition={{ duration: 0.8, ease: [0.16, 1, 0.3, 1] }}
+          className="relative group"
         >
-          <div className="absolute inset-0 bg-cyan-500/20 blur-[60px] rounded-full -z-10 animate-pulse-slow" />
-          <div className="inline-flex items-center gap-2 px-6 py-2.5 rounded-full bg-slate-900/40 border border-white/10 text-cyan-300 text-sm font-semibold backdrop-blur-md shadow-2xl hover:border-cyan-500/50 transition-colors cursor-default">
+          <div className="absolute inset-0 bg-cyan-500/30 blur-[40px] rounded-full -z-10 animate-pulse-slow group-hover:bg-cyan-400/40 transition-colors duration-500" />
+          <div className="inline-flex items-center gap-2 px-6 py-2.5 rounded-full bg-slate-900/60 border border-cyan-500/20 text-cyan-300 text-sm font-semibold backdrop-blur-xl shadow-lg shadow-cyan-900/20 ring-1 ring-white/5 group-hover:scale-105 transition-transform duration-300 cursor-default">
             <span className="relative flex h-2.5 w-2.5">
               <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-cyan-400 opacity-75"></span>
-              <span className="relative inline-flex rounded-full h-2.5 w-2.5 bg-cyan-500"></span>
+              <span className="relative inline-flex rounded-full h-2.5 w-2.5 bg-cyan-500 box-shadow-[0_0_12px_rgba(34,211,238,0.8)]"></span>
             </span>
             Live on Base Sepolia
           </div>
@@ -101,17 +101,17 @@ export default function Home() {
         ].map((feature, i) => (
           <motion.div
             key={i}
-            initial={{ opacity: 0, y: 30 }}
+            initial={{ opacity: 0, y: 40 }}
             whileInView={{ opacity: 1, y: 0 }}
-            viewport={{ once: true }}
-            transition={{ delay: i * 0.15 }}
-            className="p-10 rounded-[2.5rem] bg-slate-900/40 border border-white/5 hover:border-white/10 transition-all group backdrop-blur-sm hover:-translate-y-2 hover:shadow-2xl hover:shadow-cyan-900/20"
+            viewport={{ once: true, margin: "-100px" }}
+            transition={{ delay: i * 0.1, duration: 0.5, ease: "easeOut" }}
+            className="p-10 rounded-[2.5rem] bg-slate-900/40 border border-white/5 hover:border-white/10 transition-all duration-300 group backdrop-blur-md hover:-translate-y-2 hover:shadow-2xl hover:shadow-cyan-900/10"
           >
-            <div className="mb-8 p-5 rounded-2xl bg-slate-950/50 w-fit group-hover:scale-110 transition-transform shadow-lg shadow-black/40 border border-white/5">
+            <div className="mb-8 p-5 rounded-2xl bg-slate-950/50 w-fit group-hover:scale-110 transition-transform duration-300 shadow-lg shadow-black/20 border border-white/5 group-hover:border-cyan-500/20 ring-1 ring-white/5">
               {feature.icon}
             </div>
-            <h3 className="text-2xl font-bold text-white mb-4 group-hover:text-cyan-400 transition-colors">{feature.title}</h3>
-            <p className="text-slate-400 leading-relaxed text-lg font-light">{feature.desc}</p>
+            <h3 className="text-2xl font-bold text-white mb-4 group-hover:text-cyan-400 transition-colors duration-300">{feature.title}</h3>
+            <p className="text-slate-400 leading-relaxed text-lg font-light group-hover:text-slate-300 transition-colors">{feature.desc}</p>
           </motion.div>
         ))}
       </section>

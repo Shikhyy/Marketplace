@@ -6,6 +6,8 @@ import { usePrivy } from '@privy-io/react-auth';
 import { Wallet, LogOut, Loader2 } from 'lucide-react';
 import { motion } from 'framer-motion';
 
+import Image from 'next/image';
+
 export default function Navbar() {
     const { login, logout, authenticated, ready, user } = usePrivy();
     const pathname = usePathname();
@@ -24,14 +26,15 @@ export default function Navbar() {
     ];
 
     return (
-        <nav className="fixed top-0 left-0 right-0 z-50 border-b border-white/5 bg-slate-950/80 backdrop-blur-md">
+        <nav className="fixed top-0 left-0 right-0 z-50 border-b border-white/5 bg-slate-950/70 backdrop-blur-xl supports-[backdrop-filter]:bg-slate-950/60">
             <div className="container mx-auto px-6 h-16 flex items-center justify-between">
                 {/* Logo */}
-                <Link href="/" className="flex items-center gap-2 group">
-                    <div className="w-8 h-8 rounded-lg bg-gradient-to-tr from-cyan-500 to-blue-600 flex items-center justify-center group-hover:scale-105 transition-transform">
-                        <span className="font-bold text-white text-lg">W</span>
+                <Link href="/" className="flex items-center gap-2 group relative">
+                    <div className="absolute -inset-2 bg-cyan-500/20 rounded-full blur-lg opacity-0 group-hover:opacity-100 transition-opacity duration-500" />
+                    <div className="relative w-10 h-10 flex items-center justify-center group-hover:scale-105 transition-transform drop-shadow-[0_0_15px_rgba(34,211,238,0.3)]">
+                        <Image src="/logo.png" alt="ContentHub" fill className="object-contain" />
                     </div>
-                    <span className="font-bold text-white tracking-tight">Content<span className="text-cyan-400">Hub</span></span>
+                    <span className="relative font-bold text-white tracking-tight text-lg">Content<span className="text-cyan-400">Hub</span></span>
                 </Link>
 
                 {/* Links */}
@@ -46,7 +49,7 @@ export default function Navbar() {
                             {pathname === link.href && (
                                 <motion.div
                                     layoutId="navbar-underline"
-                                    className="absolute -bottom-1 left-0 right-0 h-0.5 bg-cyan-500 rounded-full"
+                                    className="absolute -bottom-1 left-0 right-0 h-0.5 bg-gradient-to-r from-cyan-400 to-blue-500 rounded-full shadow-[0_0_8px_rgba(34,211,238,0.5)]"
                                 />
                             )}
                         </Link>

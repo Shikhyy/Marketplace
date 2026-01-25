@@ -212,14 +212,23 @@ export function useX402() {
                     throw new Error(`ERC20 Transfer failed: ${err.message}`);
                 }
             } else {
-                // Native ETH Transfer (Fallback or direct tip)
+                // Native ETH Transfer (Direct to Creator)
                 try {
+                    let txData = '0x';
+                    // Encode Content ID as data if present
+                    if (metadata.paymentParameter?.contentId) {
+                        // Pad to 32 bytes (64 hex chars)
+                        const contentIdHex = BigInt(metadata.paymentParameter.contentId).toString(16).padStart(64, '0');
+                        txData = `0x${contentIdHex}`;
+                    }
+
                     txHash = await provider.request({
                         method: 'eth_sendTransaction',
                         params: [{
                             to: metadata.recipient,
                             value: '0x' + BigInt(metadata.amount).toString(16),
-                            from: wallet.address
+                            from: wallet.address,
+                            data: txData
                         }]
                     }) as string;
                 } catch (err: any) {

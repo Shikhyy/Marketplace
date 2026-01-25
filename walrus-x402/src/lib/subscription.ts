@@ -143,8 +143,46 @@ export async function checkContentAccess(
 export async function verifyPaymentTransaction(
     txHash: string,
     expectedAmount: bigint,
-    creatorAddress: Address
+    creatorAddress: Address,
+    contentId?: string
 ): Promise<boolean> {
-    // Basic TX check, but access relies on smart contract state now
-    return true;
+    try {
+        const client = createPublicClient({
+            chain: baseSepolia,
+            transport: http()
+        });
+
+        const tx = await client.getTransaction({
+            hash: txHash as `0x${string}`
+        });
+
+        // 1. Verify Recipient
+        if (tx.to?.toLowerCase() !== creatorAddress.toLowerCase()) {
+            console.error(`Verification Failed: Recipient mismatch. Expected ${creatorAddress}, got ${tx.to}`);
+            return false;
+        }
+
+        // 2. Verify Amount (allow for small gas differences if needed, but exact matches preferred)
+        if (tx.value < expectedAmount) {
+            console.error(`Verification Failed: Insufficient amount. Expected ${expectedAmount}, got ${tx.value}`);
+            return false;
+        }
+
+        // 3. Verify Content ID (if provided)
+        if (contentId) {
+            const expectedData = '0x' + BigInt(contentId).toString(16).padStart(64, '0');
+            if (tx.input !== expectedData) {
+                console.warn(`Verification Warning: Content ID mismatch or missing data. Expected ${expectedData}, got ${tx.input}`);
+                // We might allow this to pass if strictly checking payment amount is enough, 
+                // but for direct mapping, data is key.
+                // For now, return false to be strict.
+                return false;
+            }
+        }
+
+        return true;
+    } catch (error) {
+        console.error('Error verifying transaction:', error);
+        return false;
+    }
 }

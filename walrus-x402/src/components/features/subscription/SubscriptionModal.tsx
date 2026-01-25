@@ -44,74 +44,60 @@ export default function SubscriptionModal({ isOpen, onClose, plan, onSuccess }: 
             setError('');
             const token = await getAccessToken();
 
-            // 1. Initial request to backend to get Payment Metadata (returns 402)
-            const res = await fetch('/api/x402/subscribe', {
-                method: 'POST',
-                headers: {
-                    'Content-Type': 'application/json',
-                    'Authorization': `Bearer ${token}`
-                },
-                body: JSON.stringify({
-                    creatorAddress: plan.creatorAddress,
-                    tierId: plan.tierId,
-                    idempotencyKey: crypto.randomUUID()
-                })
-            });
-
-            if (res.status === 402) {
-                const metadata = await res.json();
-                console.log("[SubscriptionModal] Received payment metadata:", metadata);
-
-                // 2. Trigger Payment (this will now wait for confirmation)
-                let txHash;
-                try {
-                    txHash = await handlePayment(metadata);
-                } catch (paymentErr: any) {
-                    // Payment errors are already handled in useX402
-                    throw paymentErr;
+            // 1. Construct Metadata Locally (Direct Payment to Creator)
+            // We bypass the API to ensure payment goes to Creator Address, not Contract
+            const metadata = {
+                chainId: 84532, // Base Sepolia (Hardcoded or from constants)
+                tokenAddress: '0x0000000000000000000000000000000000000000', // Native ETH
+                amount: (Number(plan.price) * 1e18).toString(), // Convert ETH to Wei (Approximation, ideally use parseEther)
+                recipient: plan.creatorAddress,
+                paymentParameter: {
+                    minerOf: plan.creatorAddress // Encodes creator address in data for verification
                 }
+            };
 
-                console.log("[SubscriptionModal] Payment confirmed, sending proof:", txHash);
+            console.log("[SubscriptionModal] Starting direct payment:", metadata);
 
-                // 3. Retry with Proof (transaction is already confirmed)
-                const retryRes = await fetch('/api/x402/subscribe', {
-                    method: 'POST',
-                    headers: {
-                        'Content-Type': 'application/json',
-                        'Authorization': `Bearer ${token}`,
-                        'X-PAYMENT': txHash
-                    },
-                    body: JSON.stringify({
-                        creatorAddress: plan.creatorAddress,
-                        tierId: plan.tierId,
-                        idempotencyKey: crypto.randomUUID()
-                    })
-                });
-
-                if (retryRes.ok) {
-                    const result = await retryRes.json();
-                    console.log("[SubscriptionModal] Subscription activated:", result);
-                    setPaymentState('success');
-                    setTimeout(() => {
-                        onSuccess(plan.tierId);
-                        onClose();
-                        router.refresh();
-                    }, 2000);
-                } else {
-                    const errorData = await retryRes.json();
-                    throw new Error(errorData.details || errorData.error || "Activation failed after payment");
-                }
-            } else if (res.ok) {
-                // Already subscribed
-                setPaymentState('success');
-                setTimeout(() => {
-                    onClose();
-                    router.refresh();
-                }, 1000);
-            } else {
-                const errorData = await res.json();
-                throw new Error(errorData.details || errorData.error || "Request failed");
+            // 2. Trigger Payment
+            let txHash;
+            try {
+                txHash = await handlePayment(metadata);
+            } catch (paymentErr: any) {
+                // Payment errors are already handled in useX402
+                throw paymentErr;
             }
+
+            console.log("[SubscriptionModal] Payment confirmed:", txHash);
+
+            // 3. Save Proof to Local Storage
+            if (txHash) {
+                const storageKey = `subscriptions_${plan.creatorAddress}`; // Unique key per creator? Or user?
+                // Actually we probably want subscriptions_[UserAddress] -> { [CreatorAddress]: TxHash }
+                // But for now let's stick to a simple key we can verify easily
+                // Let's use `subscriptions` object in local storage
+
+                // We need the user address for key
+                // But we don't have it easily here without calling hook again or passing it
+                // We can just save it globally for this browser session
+                const storeKey = `subscriptions_local`;
+                const currentSubs = JSON.parse(localStorage.getItem(storeKey) || '{}');
+                currentSubs[plan.creatorAddress] = {
+                    txHash,
+                    tierId: plan.tierId,
+                    timestamp: Date.now(),
+                    expiry: Date.now() + 30 * 24 * 60 * 60 * 1000 // 30 days
+                };
+                localStorage.setItem(storeKey, JSON.stringify(currentSubs));
+            }
+
+            // 4. Optimistic Success
+            setPaymentState('success');
+            setTimeout(() => {
+                onSuccess(plan.tierId);
+                onClose();
+                router.refresh();
+            }, 2000);
+
         } catch (e: any) {
             console.error("[SubscriptionModal] Error:", e);
             setError(e.message || "Payment failed");

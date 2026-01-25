@@ -119,9 +119,12 @@ export default function UploadPage() {
             LIGHTHOUSE_API_KEY,
             undefined,
             (progressData: any) => {
-                const percentage = typeof progressData.total === 'number' && typeof progressData.uploaded === 'number' && progressData.total > 0
-                    ? Math.round((progressData.uploaded / progressData.total) * 100)
-                    : 0;
+                let percentage = 0;
+                if (progressData?.total && progressData?.uploaded) {
+                    percentage = Math.round((progressData.uploaded / progressData.total) * 100);
+                } else if (progressData?.progress) {
+                    percentage = Math.round(progressData.progress); // Assuming 0-100 based on SDK behavior
+                }
                 setProgress(`Uploading ${file.type.split('/')[0]}: ${percentage}%`);
             }
         );
@@ -213,9 +216,9 @@ export default function UploadPage() {
             setUploading(false);
             alert('Content uploaded successfully!');
 
-        } catch (error) {
+        } catch (error: any) {
             console.error('Upload failed:', error);
-            alert('Upload failed. See console for details.');
+            alert(`Upload failed: ${error?.message || error}. See console for details.`);
             setUploading(false);
         }
     };

@@ -24,10 +24,12 @@ export default function RootLayout({
     <html lang="en" className="dark" suppressHydrationWarning>
       <body className={`${font.className} bg-slate-950 text-slate-100 min-h-screen`} suppressHydrationWarning>
         <Providers>
-          <Navbar />
-          <main className="pt-24 pb-20 px-4 md:px-6 max-w-7xl mx-auto space-y-12">
-            {children}
-          </main>
+          <>
+            <Navbar />
+            <main className="pt-24 pb-20 px-4 md:px-6 max-w-7xl mx-auto space-y-12">
+              {children}
+            </main>
+          </>
         </Providers>
       </body>
     </html>

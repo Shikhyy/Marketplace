@@ -329,25 +329,29 @@ export default function ContentPage(props: { params: Promise<{ id: string }> }) 
                 }
 
                 // 1. Check Local Storage "Proof of Payment" (Direct Logic)
-                const storageKey = `rentals_${user?.wallet?.address}`;
-                const storedRentals = JSON.parse(localStorage.getItem(storageKey) || '{}');
-                const proofHash = storedRentals[content!.id];
+                const storageKeyRentals = `rentals_${user?.wallet?.address}`;
+                const storedRentals = JSON.parse(localStorage.getItem(storageKeyRentals) || '{}');
+                const rentalProof = storedRentals[content!.id];
 
-                if (proofHash) {
-                    console.log("[Access] Found proof in storage, verifying:", proofHash);
-                    // Verify on-chain logic would go here, imported from subscription.ts
-                    // For client-side speed, we trust the hash exists for now, 
-                    // or ideally call a serverless function that uses verifyPaymentTransaction
-                    // But since we want "No DB", we can try to rely on client verification or just trust it for this session if validated once.
+                const storageKeySubs = `subscriptions_${user?.wallet?.address}`;
+                const storedSubs = JSON.parse(localStorage.getItem(storageKeySubs) || '{}');
+                const subProof = storedSubs[content!.creatorAddress.toLowerCase()];
 
-                    // Let's do a quick client-side check if we can import the verify function
-                    // We can't easily import the library function here if it uses node modules not friendly to client?
-                    // Actually viem works on client.
-
-                    // We will optimistically grant access if hash exists, 
-                    // and background verify it if needed.
+                if (rentalProof) {
+                    console.log("[Access] Found rental proof in storage:", rentalProof);
                     setAuthorized(true);
                     return;
+                }
+
+                if (subProof) {
+                    const now = Date.now();
+                    const subscribedAt = subProof.timestamp;
+                    const thirtyDaysMs = 30 * 24 * 60 * 60 * 1000;
+                    if (now - subscribedAt < thirtyDaysMs) {
+                        console.log("[Access] Found subscription proof in storage");
+                        setAuthorized(true);
+                        return;
+                    }
                 }
 
                 const client = createPublicClient({

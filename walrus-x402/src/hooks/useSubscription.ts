@@ -10,6 +10,7 @@ export function useSubscription(creatorAddress: string) {
     const [expiry, setExpiry] = useState<number>(0);
     const [isLoading, setIsLoading] = useState(true);
 
+
     const checkStatus = async () => {
         if (!creatorAddress || !user?.wallet?.address) {
             setIsLoading(false);
@@ -17,6 +18,25 @@ export function useSubscription(creatorAddress: string) {
         }
 
         try {
+            // 1. Check Local Storage "Proof of Payment" (Direct Logic)
+            const storageKey = `subscriptions_${user.wallet.address}`;
+            const storedSubs = JSON.parse(localStorage.getItem(storageKey) || '{}');
+            const subProof = storedSubs[creatorAddress.toLowerCase()];
+
+            if (subProof) {
+                // Determine if expired (30 days)
+                const now = Date.now();
+                const subscribedAt = subProof.timestamp;
+                const thirtyDaysMs = 30 * 24 * 60 * 60 * 1000;
+
+                if (now - subscribedAt < thirtyDaysMs) {
+                    setIsSubscribed(true);
+                    setExpiry(Math.floor((subscribedAt + thirtyDaysMs) / 1000));
+                    setIsLoading(false);
+                    return;
+                }
+            }
+
             const client = createPublicClient({
                 chain: baseSepolia,
                 transport: http()
@@ -33,14 +53,15 @@ export function useSubscription(creatorAddress: string) {
             setIsSubscribed(status);
 
             // Also fetch exact expiry if needed
-            const expiryTimestamp = await client.readContract({
-                address: CREATOR_HUB_ADDRESS as `0x${string}`,
-                abi: CREATOR_HUB_ABI,
-                functionName: 'subscriptions',
-                args: [user.wallet.address as `0x${string}`, creatorAddress as `0x${string}`]
-            }) as bigint;
-
-            setExpiry(Number(expiryTimestamp));
+            if (status) {
+                const expiryTimestamp = await client.readContract({
+                    address: CREATOR_HUB_ADDRESS as `0x${string}`,
+                    abi: CREATOR_HUB_ABI,
+                    functionName: 'subscriptions',
+                    args: [user.wallet.address as `0x${string}`, creatorAddress as `0x${string}`]
+                }) as bigint;
+                setExpiry(Number(expiryTimestamp));
+            }
 
         } catch (e) {
             console.error("Failed to check on-chain subscription:", e);

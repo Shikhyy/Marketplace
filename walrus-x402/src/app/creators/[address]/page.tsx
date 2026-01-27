@@ -5,6 +5,7 @@ import { Shield, Lock, Play, CheckCircle, Upload, Wallet, Loader2 } from 'lucide
 import Link from 'next/link';
 import { usePrivy, useWallets } from '@privy-io/react-auth';
 import { useSubscription } from '@/hooks/useSubscription';
+import { useX402 } from '@/hooks/useX402';
 import { createPublicClient, createWalletClient, custom, formatEther, http } from 'viem';
 import { baseSepolia } from 'viem/chains';
 import { CREATOR_HUB_ADDRESS, CREATOR_HUB_ABI, NEXT_PUBLIC_IPFS_GATEWAY } from '@/config/constants';
@@ -144,6 +145,8 @@ export default function CreatorProfile(props: { params: Promise<{ address: strin
         if (params.address) fetchData();
     }, [params.address]);
 
+    const { handlePayment, paymentState, loading: paymentLoading } = useX402();
+
     const handleSubscribe = async () => {
         if (!authenticated || !wallets.length) {
             alert("Please connect your wallet first.");
@@ -152,34 +155,45 @@ export default function CreatorProfile(props: { params: Promise<{ address: strin
 
         setIsSubscribing(true);
         try {
-            const wallet = wallets[0];
-            await wallet.switchChain(baseSepolia.id);
-            const provider = await wallet.getEthereumProvider();
-            const walletClient = createWalletClient({
-                chain: baseSepolia,
-                transport: custom(provider)
+            // Direct Payment to Creator using useX402
+            // Currently subscriptions are priced in ETH (NATIVE) based on contract 'price'
+            // We read the price from the chain but send it directly to the creator
+
+            const txHash = await handlePayment({
+                chainId: baseSepolia.id,
+                tokenAddress: '0x0000000000000000000000000000000000000000', // Native ETH
+                amount: subscriptionPrice.toString(),
+                recipient: params.address, // Direct to Creator
+                paymentParameter: {
+                    minerOf: params.address // Metadata for subscription intent
+                }
             });
 
-            const hash = await walletClient.writeContract({
-                address: CREATOR_HUB_ADDRESS as `0x${string}`,
-                abi: CREATOR_HUB_ABI,
-                functionName: 'subscribe',
-                args: [params.address as `0x${string}`],
-                value: subscriptionPrice,
-                account: wallet.address as `0x${string}`
-            });
+            console.log("Subscription tx:", txHash);
 
-            console.log("Subscription tx:", hash);
-            alert("Transaction sent! Waiting for confirmation...");
+            // Save Proof to Local Storage
+            if (txHash && user?.wallet?.address) {
+                const storageKey = `subscriptions_${user.wallet.address}`;
+                const currentSubs = JSON.parse(localStorage.getItem(storageKey) || '{}');
 
-            setTimeout(() => {
-                refresh();
-                setIsSubscribing(false);
-            }, 5000);
+                currentSubs[params.address.toLowerCase()] = {
+                    hash: txHash,
+                    timestamp: Date.now()
+                };
+
+                localStorage.setItem(storageKey, JSON.stringify(currentSubs));
+                console.log("[Subscription] Saved proof locally:", txHash);
+            }
+
+            alert("Subscription activated!");
+
+            // Immediate refresh
+            refresh();
+            setIsSubscribing(false);
 
         } catch (error) {
             console.error("Subscription failed:", error);
-            alert("Subscription failed. See console for details.");
+            // alert("Subscription failed. See console for details.");
             setIsSubscribing(false);
         }
     };

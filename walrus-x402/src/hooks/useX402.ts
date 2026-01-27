@@ -219,7 +219,11 @@ export function useX402() {
                     if (metadata.paymentParameter?.contentId) {
                         // Pad to 32 bytes (64 hex chars)
                         const contentIdHex = BigInt(metadata.paymentParameter.contentId).toString(16).padStart(64, '0');
-                        txData = `0x${contentIdHex}`;
+                    } else if (metadata.paymentParameter?.minerOf) {
+                        // Subscription: Encode creator address
+                        // Pad to 32 bytes (64 hex chars)
+                        const minerOfHex = metadata.paymentParameter.minerOf.replace('0x', '').padStart(64, '0');
+                        txData = `0x${minerOfHex}`;
                     }
 
                     txHash = await provider.request({

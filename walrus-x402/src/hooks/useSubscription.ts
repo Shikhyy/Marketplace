@@ -24,7 +24,6 @@ export function useSubscription(creatorAddress: string) {
             const subProof = storedSubs[creatorAddress.toLowerCase()];
 
             if (subProof) {
-                // Determine if expired (30 days)
                 const now = Date.now();
                 const subscribedAt = subProof.timestamp;
                 const thirtyDaysMs = 30 * 24 * 60 * 60 * 1000;
@@ -36,6 +35,7 @@ export function useSubscription(creatorAddress: string) {
                     return;
                 }
             }
+
 
             const client = createPublicClient({
                 chain: baseSepolia,

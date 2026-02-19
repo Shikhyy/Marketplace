@@ -1,6 +1,7 @@
 'use client';
 
-import { useEffect, useState, use } from 'react';
+import { useEffect, useState, use, useCallback } from 'react';
+import { toast } from 'sonner';
 import { usePrivy, useWallets } from '@privy-io/react-auth';
 import { Loader2, Lock, Play, Pause, Volume2, Maximize, User, ShieldCheck, CheckCircle, AlertCircle, Share2, Wallet } from 'lucide-react';
 import Link from 'next/link';
@@ -33,7 +34,8 @@ export default function ContentPage(props: { params: Promise<{ id: string }> }) 
     const params = use(props.params);
     const { getAccessToken, authenticated, login, user } = usePrivy();
     const { wallets } = useWallets();
-    const { handlePayment, paymentState, loading: paymentLoading, error: paymentError } = useX402();
+    const { handlePayment, paymentState, error: paymentError } = useX402();
+    const paymentLoading = paymentState !== 'idle' && paymentState !== 'success' && paymentState !== 'error';
 
     const addTokenToWallet = async () => {
         if (!wallets?.[0]) return;
@@ -58,12 +60,17 @@ export default function ContentPage(props: { params: Promise<{ id: string }> }) 
 
     const [loading, setLoading] = useState(true);
     const [authorized, setAuthorized] = useState(false);
+    const [verifyingAccess, setVerifyingAccess] = useState(true); // New state to prevent flash
     const [content, setContent] = useState<ContentData | null>(null);
+    const [streamUrl, setStreamUrl] = useState<string | null>(null);
+
     const [error, setError] = useState('');
     const [relatedContent, setRelatedContent] = useState<ContentData[]>([]);
 
     // Purchase Options State
     const [purchaseType, setPurchaseType] = useState<'rent' | 'buy'>('rent');
+    const [isPaying, setIsPaying] = useState(false);
+    const [isPlaying, setIsPlaying] = useState(false);
 
     useEffect(() => {
         async function fetchContent() {
@@ -144,7 +151,7 @@ export default function ContentPage(props: { params: Promise<{ id: string }> }) 
                                     ? metadataURI.replace('ipfs://', GATEWAY)
                                     : `${GATEWAY}${metadataURI}`;
 
-                            console.log('Fetching metadata:', { metadataURI, gatewayUrl });
+                            // console.log('Fetching metadata:', { metadataURI, gatewayUrl }); // Removed for privacy
                             const metaRes = await fetch(gatewayUrl);
 
                             if (!metaRes.ok) {
@@ -316,79 +323,80 @@ export default function ContentPage(props: { params: Promise<{ id: string }> }) 
         fetchContent();
     }, [params.id]);
 
-    // Check Authorization & Watch Payment
-    useEffect(() => {
-        if (!content || !authenticated || !user?.wallet?.address) return;
-
-        async function verifyAccess() {
-            try {
-                // If we just paid successfully, force authorize immediately
-                if (paymentState === 'verifying' || paymentState === 'success') {
-                    setAuthorized(true);
-                    return;
-                }
-
-                // 1. Check Local Storage "Proof of Payment" (Direct Logic)
-                const storageKeyRentals = `rentals_${user?.wallet?.address}`;
-                const storedRentals = JSON.parse(localStorage.getItem(storageKeyRentals) || '{}');
-                const rentalProof = storedRentals[content!.id];
-
-                const storageKeySubs = `subscriptions_${user?.wallet?.address}`;
-                const storedSubs = JSON.parse(localStorage.getItem(storageKeySubs) || '{}');
-                const subProof = storedSubs[content!.creatorAddress.toLowerCase()];
-
-                if (rentalProof) {
-                    console.log("[Access] Found rental proof in storage:", rentalProof);
-                    setAuthorized(true);
-                    return;
-                }
-
-                if (subProof) {
-                    const now = Date.now();
-                    const subscribedAt = subProof.timestamp;
-                    const thirtyDaysMs = 30 * 24 * 60 * 60 * 1000;
-                    if (now - subscribedAt < thirtyDaysMs) {
-                        console.log("[Access] Found subscription proof in storage");
-                        setAuthorized(true);
-                        return;
-                    }
-                }
-
-                const client = createPublicClient({
-                    chain: baseSepolia,
-                    transport: http()
-                });
-
-                // 2. Fallback: Check Contract (Legacy)
-                const [isSubscribed, isRented] = await Promise.all([
-                    client.readContract({
-                        address: CREATOR_HUB_ADDRESS as `0x${string}`,
-                        abi: CREATOR_HUB_ABI,
-                        functionName: 'checkSubscription',
-                        args: [user?.wallet?.address as `0x${string}`, content!.creatorAddress as `0x${string}`]
-                    }) as Promise<boolean>,
-                    client.readContract({
-                        address: CREATOR_HUB_ADDRESS as `0x${string}`,
-                        abi: CREATOR_HUB_ABI,
-                        functionName: 'checkRental',
-                        args: [user?.wallet?.address as `0x${string}`, BigInt(content!.id)]
-                    }) as Promise<boolean>
-                ]);
-
-                if (isSubscribed || isRented) {
-                    setAuthorized(true);
-                    return;
-                }
-
-                checkAuthorization();
-
-            } catch (e) {
-                console.error("Access verification failed", e);
-            }
+    const verifyAccess = useCallback(async () => {
+        if (!content || !authenticated || !user?.wallet?.address) {
+            setVerifyingAccess(false);
+            return;
         }
 
+        try {
+            setVerifyingAccess(true); // Start verification
+            // 1. Check Local Storage "Proof of Payment"
+            const storageKeyRentals = `rentals_${user?.wallet?.address}`;
+            const storedRentals = JSON.parse(localStorage.getItem(storageKeyRentals) || '{}');
+            const rentalEntry = storedRentals[content.id];
+
+            let paymentProof = null;
+            if (rentalEntry) {
+                if (typeof rentalEntry === 'string') {
+                    // Legacy format (no timestamp) -> STRICT: Treated as Expired
+                    paymentProof = null;
+                } else if (rentalEntry.txHash && rentalEntry.timestamp) {
+                    // New format with timestamp: Check strict 24h expiry
+                    const now = Date.now();
+                    const rentDuration = 24 * 60 * 60 * 1000; // 24 hours
+                    if (now - rentalEntry.timestamp < rentDuration) {
+                        paymentProof = rentalEntry.txHash;
+                    }
+                    // Else: Expired locally, no proof used
+                }
+            }
+
+            // Check Subscription (Not fully supported on P2P backend yet unless we index it, 
+            // but we will send the sub tx hash if found. Backend only verifies generic 'txHash')
+            if (!paymentProof) {
+                const storageKeySubs = `subscriptions_${user?.wallet?.address}`;
+                const storedSubs = JSON.parse(localStorage.getItem(storageKeySubs) || '{}');
+                const subProof = storedSubs[content.creatorAddress.toLowerCase()]; // { txHash, timestamp }
+                if (subProof) {
+                    // Check expiry (30 days)
+                    if (Date.now() - subProof.timestamp < 30 * 24 * 60 * 60 * 1000) {
+                        paymentProof = subProof.hash || subProof.txHash; // Handle both formats if flexible
+                    }
+                }
+            }
+
+            // 2. Call x402 API
+            // Even if no proof, call it to see if it's Free (402 check)
+            const headers: any = {};
+            if (paymentProof) headers['X-PAYMENT'] = paymentProof;
+
+            const res = await fetch(`/api/video/${content.id}`, {
+                headers: headers
+            });
+
+            if (res.ok) {
+                // API redirects or returns 200 with content
+                setStreamUrl(res.url);
+                setAuthorized(true);
+            } else if (res.status === 402) {
+                const data = await res.json();
+                console.log("[Access] Payment Required:", data);
+                setAuthorized(false);
+            } else {
+                console.warn("[Access] API Error:", res.status);
+            }
+
+        } catch (e) {
+            console.error("Access verification failed", e);
+        } finally {
+            setVerifyingAccess(false);
+        }
+    }, [content, authenticated, user]);
+
+    useEffect(() => {
         verifyAccess();
-    }, [content, authenticated, paymentState, user]);
+    }, [verifyAccess]);
 
     const checkAuthorization = async () => {
         if (!content || !authenticated) return;
@@ -401,7 +409,8 @@ export default function ContentPage(props: { params: Promise<{ id: string }> }) 
                     'Content-Type': 'application/json'
                 },
                 body: JSON.stringify({
-                    creatorAddress: content.creatorAddress
+                    creatorAddress: content.creatorAddress,
+                    userWallet: user?.wallet?.address
                 })
             });
             const data = await res.json();
@@ -412,44 +421,48 @@ export default function ContentPage(props: { params: Promise<{ id: string }> }) 
     };
 
     const handleBuy = async () => {
-        if (!content) return;
+        if (!content || !wallets.length) {
+            toast.error("Please connect your wallet");
+            return;
+        }
+
+        // Use x402 Hook for standardized payment
+        // We set recipient to creatorAddress to ensure Direct Payment
         try {
             const amount = purchaseType === 'rent' ? content.rentPrice : content.price;
 
-            // Determine recipient and parameters based on purchase type
-            let recipient = content.creatorAddress;
-            let paymentParams = {};
-
-            if (purchaseType === 'rent') {
-                // Rentals now go DIRECT to Creator (Direct ETH Transfer)
-                // We bypass the contract to fix the "Unknown Address" issue
-                recipient = content.creatorAddress;
-                paymentParams = {
-                    contentId: content.id
-                };
-            }
-            // 'buy' (Lifetime/Full Price) currently falls back to direct transfer 
-            // as CreatorHub doesn't have a 'buyContent' function yet. 
-            // TODO: Implement 'buyContent' in contract for verifiable ownership.
-
-            const txHash = await handlePayment({
+            // Payment Metadata
+            const metadata = {
                 chainId: CHAIN_ID,
-                tokenAddress: content.paymentToken,
+                tokenAddress: '0x0000000000000000000000000000000000000000', // FORCE ETH: Contract rentContent() requires msg.value
                 amount: amount,
-                recipient: recipient,
-                paymentParameter: paymentParams
-            });
+                recipient: content.creatorAddress, // DIRECT TO CREATOR
+                paymentParameter: {
+                    contentId: content.id
+                }
+            };
 
-            // If successful, save Proof of Payment to Local Storage for Persistence
-            if (txHash && purchaseType === 'rent') {
+            const txHash = await handlePayment(metadata);
+
+            if (txHash) {
+                console.log("[Payment] Success:", txHash);
+
+                // Save Proof to Local Storage (Client-side Indexing)
+                // Required because Direct Payments don't update contract state immediately/at all
                 const storageKey = `rentals_${user?.wallet?.address}`;
                 const currentRentals = JSON.parse(localStorage.getItem(storageKey) || '{}');
-                currentRentals[content.id] = txHash;
+                currentRentals[content.id] = { txHash, timestamp: Date.now() };
                 localStorage.setItem(storageKey, JSON.stringify(currentRentals));
-                console.log("[Payment] Saved rental proof:", txHash);
+
+                toast.success("Payment successful! Access granted.");
+
+                // Re-verify immediately with the new proof
+                await verifyAccess();
             }
-        } catch (e) {
-            console.error(e);
+
+        } catch (e: any) {
+            console.error("Payment failed:", e);
+            toast.error("Payment failed: " + (e.message || "Unknown error"));
         }
     };
 
@@ -501,11 +514,21 @@ export default function ContentPage(props: { params: Promise<{ id: string }> }) 
 
                             {/* Unlock Animation Overlay */}
                             <AnimatePresence>
-                                {!authorized && (
+                                {verifyingAccess ? (
                                     <motion.div
-                                        initial={{ opacity: 1, backdropFilter: "blur(12px)" }}
+                                        initial={{ opacity: 1 }}
+                                        exit={{ opacity: 0 }}
+                                        className="absolute inset-0 z-20 flex flex-col items-center justify-center bg-slate-900/60 backdrop-blur-md p-6 text-center"
+                                    >
+                                        <Loader2 className="w-10 h-10 text-cyan-500 animate-spin mb-2" />
+                                        <p className="text-slate-400 text-xs font-medium tracking-wide">Verifying Access...</p>
+                                    </motion.div>
+                                ) : !authorized && (
+                                    <motion.div
+                                        initial={{ opacity: 0, backdropFilter: "blur(0px)" }}
+                                        animate={{ opacity: 1, backdropFilter: "blur(12px)" }}
                                         exit={{ opacity: 0, backdropFilter: "blur(0px)" }}
-                                        transition={{ duration: 0.8, ease: "easeInOut" }}
+                                        transition={{ duration: 0.5, ease: "easeInOut" }}
                                         className="absolute inset-0 z-20 flex flex-col items-center justify-center bg-slate-900/60 p-6 text-center"
                                     >
                                         {!authenticated ? (
@@ -538,8 +561,8 @@ export default function ContentPage(props: { params: Promise<{ id: string }> }) 
                                                             <ShieldCheck className="w-5 h-5 text-indigo-400" />
                                                         </div>
                                                         <div>
-                                                            <h2 className="text-lg font-bold text-white tracking-tight">Unlock Content</h2>
-                                                            <p className="text-slate-400 text-[10px] mt-0.5">Choose a plan to decrypt and watch.</p>
+                                                            <h2 className="text-lg font-black text-white tracking-tight drop-shadow-md">Unlock Content</h2>
+                                                            <p className="text-slate-300 font-medium text-xs mt-0.5 drop-shadow-sm">Choose a plan to decrypt and watch.</p>
                                                         </div>
                                                     </div>
 
@@ -571,9 +594,9 @@ export default function ContentPage(props: { params: Promise<{ id: string }> }) 
                                                         <div className="flex flex-col items-center py-1 space-y-0.5">
                                                             <div className="flex items-end gap-1">
                                                                 <span className="text-3xl font-black text-white tracking-tighter drop-shadow-lg">
-                                                                    {(Number(activePrice) / 1000000).toLocaleString(undefined, { minimumFractionDigits: 0, maximumFractionDigits: 4 })}
+                                                                    {parseFloat(formatEther(BigInt(activePrice))).toLocaleString(undefined, { maximumFractionDigits: 6 })}
                                                                 </span>
-                                                                <span className="text-xs font-bold text-slate-500 mb-1">USDC</span>
+                                                                <span className="text-xs font-bold text-slate-500 mb-1">ETH</span>
                                                             </div>
                                                             <span className={`text-[9px] font-bold uppercase tracking-widest py-0.5 px-2 rounded-full border ${purchaseType === 'rent' ? 'bg-indigo-500/10 border-indigo-500/20 text-indigo-300' : 'bg-emerald-500/10 border-emerald-500/20 text-emerald-300'}`}>
                                                                 {purchaseType === 'rent' ? '24 Hour Access' : 'Lifetime Access (Direct)'}
@@ -582,29 +605,32 @@ export default function ContentPage(props: { params: Promise<{ id: string }> }) 
 
                                                         <button
                                                             onClick={handleBuy}
-                                                            disabled={paymentLoading || paymentState === 'success' || paymentState === 'verifying'}
-                                                            className="w-full py-3 bg-gradient-to-r from-indigo-600 to-indigo-500 hover:from-indigo-500 hover:to-indigo-400 disabled:opacity-50 disabled:cursor-not-allowed text-white font-bold rounded-xl transition-all shadow-[0_0_30px_-5px_rgba(99,102,241,0.4)] hover:shadow-[0_0_40px_-5px_rgba(99,102,241,0.5)] flex justify-center items-center gap-2 group/btn border border-white/10"
+                                                            disabled={paymentLoading || paymentState === 'success'}
+                                                            className={`w-full py-3 bg-gradient-to-r hover:from-indigo-500 hover:to-indigo-400 disabled:opacity-50 disabled:cursor-not-allowed text-white font-bold rounded-xl transition-all shadow-[0_0_30px_-5px_rgba(99,102,241,0.4)] hover:shadow-[0_0_40px_-5px_rgba(99,102,241,0.5)] flex justify-center items-center gap-2 group/btn border border-white/10 ${paymentState === 'error' ? 'from-red-600 to-red-500 hover:from-red-500 hover:to-red-400' : 'from-indigo-600 to-indigo-500'}`}
                                                         >
-                                                            {paymentLoading || paymentState === 'paying' || paymentState === 'confirming' || paymentState === 'verifying' ? (
+                                                            {paymentLoading || (paymentState !== 'idle' && paymentState !== 'error') ? (
                                                                 <>
                                                                     <Loader2 className="w-5 h-5 animate-spin" />
-                                                                    <span className="text-sm">Processing...</span>
+                                                                    <span className="text-sm">
+                                                                        {paymentState === 'preparing' && 'Preparing...'}
+                                                                        {paymentState === 'signing' && 'Sign in Wallet...'}
+                                                                        {paymentState === 'confirming' && 'Confirming...'}
+                                                                        {paymentState === 'verifying' && 'Verifying...'}
+                                                                        {paymentState === 'success' && 'Success!'}
+                                                                    </span>
                                                                 </>
                                                             ) : (
                                                                 <>
-                                                                    <span className="text-sm uppercase tracking-wider">{purchaseType === 'rent' ? 'Rent Now' : 'Buy Now'}</span>
+                                                                    <span className="text-sm uppercase tracking-wider">
+                                                                        {paymentState === 'error' ? 'Retry Payment' : (purchaseType === 'rent' ? 'Rent Now' : 'Buy Now')}
+                                                                    </span>
                                                                     <ShieldCheck className="w-5 h-5 group-hover/btn:scale-110 transition-transform" />
                                                                 </>
                                                             )}
                                                         </button>
 
                                                         {/* Add Token Button */}
-                                                        <button
-                                                            onClick={addTokenToWallet}
-                                                            className="text-[10px] text-slate-500 hover:text-indigo-400 underline decoration-slate-700 underline-offset-4 transition-colors w-full text-center"
-                                                        >
-                                                            Don't see USDC? Add to Wallet
-                                                        </button>
+                                                        {/* Add Token Button - REMOVED */}
 
                                                         {paymentError && (
                                                             <motion.div initial={{ opacity: 0, height: 0 }} animate={{ opacity: 1, height: 'auto' }} className="text-red-400 text-xs bg-red-500/10 p-3 rounded-lg flex items-start gap-2 text-left border border-red-500/20">
@@ -621,14 +647,43 @@ export default function ContentPage(props: { params: Promise<{ id: string }> }) 
                             </AnimatePresence>
 
                             {/* Video Element */}
-                            {authorized ? (
-                                <video
-                                    src={`${GATEWAY}${content.videoCID}`}
-                                    controls
-                                    autoPlay
-                                    className="w-full h-full object-contain"
-                                    poster={`${GATEWAY}${content.thumbnailCID}`}
-                                />
+                            {authorized && streamUrl ? (
+                                isPaying ? (
+                                    <div className="w-full h-full flex items-center justify-center bg-black">
+                                        <Loader2 className="w-10 h-10 text-cyan-500 animate-spin" />
+                                    </div>
+                                ) : isPlaying ? (
+                                    <video
+                                        src={streamUrl}
+                                        controls
+                                        autoPlay
+                                        className="w-full h-full object-contain"
+                                        poster={`${GATEWAY}${content.thumbnailCID}`}
+                                        crossOrigin="anonymous"
+                                    />
+                                ) : (
+                                    <div className="relative w-full h-full group cursor-pointer" onClick={() => setIsPlaying(true)}>
+                                        <img
+                                            src={`${GATEWAY}${content.thumbnailCID}`}
+                                            className="w-full h-full object-cover transition-transform duration-700 group-hover:scale-105"
+                                            alt={content.title}
+                                        />
+                                        <div className="absolute inset-0 bg-black/40 group-hover:bg-black/30 transition-colors" />
+
+                                        <div className="absolute inset-0 flex items-center justify-center">
+                                            <div className="w-20 h-20 rounded-full bg-white/10 backdrop-blur-md flex items-center justify-center border border-white/20 shadow-[0_0_30px_rgba(255,255,255,0.2)] group-hover:scale-110 transition-transform duration-300">
+                                                <Play className="w-8 h-8 fill-white text-white ml-1" />
+                                            </div>
+                                        </div>
+
+                                        <div className="absolute bottom-6 left-6 right-6">
+                                            <div className="inline-flex items-center gap-2 px-3 py-1.5 rounded-full bg-black/60 backdrop-blur border border-white/10 text-sm font-medium text-white">
+                                                <CheckCircle className="w-4 h-4 text-emerald-400" />
+                                                <span>Owned & Ready to Play</span>
+                                            </div>
+                                        </div>
+                                    </div>
+                                )
                             ) : (
                                 <img
                                     src={`${GATEWAY}${content.thumbnailCID}`}
@@ -641,7 +696,7 @@ export default function ContentPage(props: { params: Promise<{ id: string }> }) 
                         {/* Title & Stats */}
                         <div>
                             <div className="flex flex-wrap items-start justify-between gap-4 mb-4">
-                                <h1 className="text-3xl md:text-4xl font-bold text-white tracking-tight leading-tight">{content.title}</h1>
+                                <h1 className="text-3xl md:text-5xl font-black text-white tracking-tighter leading-tight drop-shadow-2xl shadow-black">{content.title}</h1>
 
                                 <div className="flex gap-2">
                                     <button className="p-3 rounded-full bg-slate-800 text-slate-400 hover:bg-slate-700 hover:text-white transition-colors">
@@ -658,7 +713,7 @@ export default function ContentPage(props: { params: Promise<{ id: string }> }) 
                                 <span>{new Date(content.timestamp * 1000).toLocaleDateString(undefined, { year: 'numeric', month: 'long', day: 'numeric' })}</span>
                             </div>
 
-                            <div className="p-6 rounded-2xl bg-white/5 border border-white/5 backdrop-blur-sm">
+                            <div className="p-6 rounded-2xl bg-slate-900/60 border border-white/10 backdrop-blur-md shadow-xl">
                                 <h3 className="text-slate-500 text-xs font-bold uppercase tracking-wider mb-2">Description</h3>
                                 <p className="text-slate-300 leading-relaxed whitespace-pre-wrap font-light text-lg">
                                     {content.description || "No description provided."}
@@ -671,9 +726,19 @@ export default function ContentPage(props: { params: Promise<{ id: string }> }) 
                     <div className="space-y-8">
 
                         {/* Creator Card */}
-                        <div className="p-6 rounded-3xl bg-slate-900/80 border border-white/5 backdrop-blur-xl shadow-xl sticky top-6">
-                            <div className="flex items-center gap-4 mb-6">
-                                <div className="w-16 h-16 rounded-full bg-gradient-to-br from-cyan-500 to-blue-600 p-[2px]">
+                        <div className="relative p-6 rounded-3xl bg-slate-900/80 border border-white/5 backdrop-blur-xl shadow-xl sticky top-6 overflow-hidden">
+                            {/* Background Image */}
+                            <div className="absolute inset-0 z-0">
+                                <img
+                                    src="https://images.unsplash.com/photo-1614850523060-8da1d56ae167?q=80&w=2670&auto=format&fit=crop"
+                                    alt="Background"
+                                    className="w-full h-full object-cover opacity-20"
+                                />
+                                <div className="absolute inset-0 bg-gradient-to-b from-slate-950/0 via-slate-950/80 to-slate-950/90" />
+                            </div>
+
+                            <div className="relative z-10 flex items-center gap-4 mb-6">
+                                <div className="w-16 h-16 rounded-full bg-gradient-to-br from-cyan-500 to-blue-600 p-[2px] shadow-lg shadow-cyan-500/20">
                                     <div className="w-full h-full rounded-full overflow-hidden bg-slate-950">
                                         <img
                                             src={`https://api.dicebear.com/7.x/shapes/svg?seed=${content.creatorAddress}`}
@@ -728,7 +793,7 @@ export default function ContentPage(props: { params: Promise<{ id: string }> }) 
                                                     <span>{new Date(item.timestamp * 1000).toLocaleDateString()}</span>
                                                     {item.isPremium && (
                                                         <span className="text-indigo-400 font-bold">
-                                                            {(Number(item.price) / 1000000).toFixed(2)}
+                                                            {item.price ? parseFloat(formatEther(BigInt(item.price))).toLocaleString(undefined, { maximumFractionDigits: 6 }) : ''} ETH
                                                         </span>
                                                     )}
                                                 </div>

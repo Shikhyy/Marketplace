@@ -9,6 +9,8 @@ import lighthouse from '@lighthouse-web3/sdk';
 import { parseUnits } from 'viem';
 import * as Tabs from '@radix-ui/react-tabs';
 import { useRouter } from 'next/navigation';
+import { useX402 } from '@/hooks/useX402';
+import { toast } from 'sonner';
 
 export default function UploadPage() {
     const { authenticated, login, user } = usePrivy();
@@ -96,12 +98,12 @@ export default function UploadPage() {
             }
 
 
-            alert('Channel registered successfully!');
+            toast.success('Channel registered successfully!');
             refetchCreator();
             setRegistering(false);
         } catch (error) {
             console.error('Registration failed:', error);
-            alert('Registration failed.');
+            toast.error('Registration failed check console for details.');
             setRegistering(false);
         }
     };
@@ -113,45 +115,65 @@ export default function UploadPage() {
         }
     };
 
-    const uploadToLighthouse = async (file: File) => {
-        const output = await lighthouse.upload(
-            [file],
-            LIGHTHOUSE_API_KEY,
-            undefined,
-            (progressData: any) => {
-                let percentage = 0;
-                if (progressData?.total && progressData?.uploaded) {
-                    percentage = Math.round((progressData.uploaded / progressData.total) * 100);
-                } else if (progressData?.progress) {
-                    percentage = Math.round(progressData.progress); // Assuming 0-100 based on SDK behavior
-                }
-                setProgress(`Uploading ${file.type.split('/')[0]}: ${percentage}%`);
-            }
-        );
-        return output.data.Hash;
+    const { handlePayment, paymentState } = useX402();
+    // ...
+
+    const uploadToServer = async (file: File, paymentProof: string, uploadId: string) => {
+        const formData = new FormData();
+        formData.append('file', file);
+
+        const res = await fetch('/api/upload/complete', {
+            method: 'POST',
+            headers: {
+                'x-payment': paymentProof,
+                'x-upload-id': uploadId
+            },
+            body: formData
+        });
+
+        if (!res.ok) {
+            const err = await res.json();
+            throw new Error(err.error || 'Upload failed');
+        }
+
+        const data = await res.json();
+        return data.cid;
     };
 
     const handleUpload = async () => {
         if (!file || !thumbnail || !title || !walletClient) return;
 
-        if (!LIGHTHOUSE_API_KEY) {
-            alert('Lighthouse API Key is missing. Please add NEXT_PUBLIC_LIGHTHOUSE_API_KEY to your .env file.');
-            console.error('Missing LIGHTHOUSE_API_KEY');
-            return;
-        }
-
-        console.log('Using Lighthouse API Key:', {
-            length: LIGHTHOUSE_API_KEY.length,
-            prefix: LIGHTHOUSE_API_KEY.substring(0, 4) + '...'
-        });
-
         try {
             setUploading(true);
-            setProgress('Starting upload...');
+            setProgress('Initializing upload...');
 
-            // 1. Upload assets to IPFS
-            const videoCID = await uploadToLighthouse(file);
-            const thumbnailCID = await uploadToLighthouse(thumbnail);
+            // 1. Request Upload Slot (Init)
+            const initRes = await fetch('/api/upload/init', { method: 'POST' });
+            if (initRes.status !== 402) {
+                // Should return 402
+                throw new Error("Unexpected init response");
+            }
+
+            const initData = await initRes.json();
+            const { uploadId } = initData;
+
+            setProgress('Payment required...');
+
+            // 2. Pay Platform Fee
+            const txHash = await handlePayment({
+                chainId: initData.chainId,
+                tokenAddress: initData.tokenAddress,
+                amount: initData.amount,
+                recipient: initData.recipient
+            });
+
+            if (!txHash) throw new Error("Payment failed");
+
+            setProgress('Uploading assets...');
+
+            // 3. Upload assets to Server (Lighthouse Proxy)
+            const videoCID = await uploadToServer(file, txHash, uploadId);
+            const thumbnailCID = await uploadToServer(thumbnail, txHash, uploadId);
 
             const address = walletClient.account.address;
 
@@ -169,7 +191,8 @@ export default function UploadPage() {
                 // Premium Content Upload
                 setProgress('Uploading metadata...');
 
-                // Create Metadata JSON
+                // For Metadata, we can also use the proxy or just create it locally?
+                // The proxy expects a 'file'. We can send a Blob.
                 const metadata = {
                     title,
                     description,
@@ -181,11 +204,10 @@ export default function UploadPage() {
 
                 const metadataBlob = new Blob([JSON.stringify(metadata)], { type: 'application/json' });
                 const metadataFile = new File([metadataBlob], 'metadata.json');
-                const metadataCID = await uploadToLighthouse(metadataFile);
+                const metadataCID = await uploadToServer(metadataFile, txHash, uploadId);
 
                 setProgress('Confirming transaction...');
 
-                // Calculate prices (approximate for now, assuming 6 decimals for USDC)
                 const fullPriceBigInt = price ? parseUnits(price, 6) : BigInt(0);
                 const rentPriceBigInt = rentPrice ? parseUnits(rentPrice, 6) : BigInt(0);
 
@@ -196,17 +218,16 @@ export default function UploadPage() {
                     args: [
                         0, // ContentType.VIDEO
                         metadataCID, // metadataURI (CID)
-                        false, // isFree (Premium content is not free by default here)
-                        fullPriceBigInt, // fullPrice
-                        rentPriceBigInt, // rentedPrice
-                        USDC_SEPOLIA_ADDRESS // paymentToken
+                        false, // isFree
+                        fullPriceBigInt,
+                        rentPriceBigInt,
+                        USDC_SEPOLIA_ADDRESS
                     ],
                     account: address
                 });
             }
 
             setProgress('Success! Processing...');
-            // Reset form
             setFile(null);
             setThumbnail(null);
             setTitle('');
@@ -214,11 +235,13 @@ export default function UploadPage() {
             setPrice('');
             setRentPrice('');
             setUploading(false);
-            alert('Content uploaded successfully!');
+            toast.success('Content uploaded successfully!', {
+                description: 'Your video is now live on the x402 network.'
+            });
 
         } catch (error: any) {
             console.error('Upload failed:', error);
-            alert(`Upload failed: ${error?.message || error}. See console for details.`);
+            toast.error(`Upload failed: ${error?.message || error}`);
             setUploading(false);
         }
     };

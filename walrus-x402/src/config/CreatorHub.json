@@ -619,9 +619,10 @@
                     "type": "uint256"
                 }
             ],
+            "name": "rentContent",
+            "outputs": [],
             "stateMutability": "payable",
-            "type": "function",
-            "name": "rentContent"
+            "type": "function"
         },
         {
             "inputs": [
@@ -686,7 +687,8 @@
             ],
             "stateMutability": "payable",
             "type": "function",
-            "name": "subscribe"
+            "name": "subscribe",
+            "outputs": []
         },
         {
             "inputs": [

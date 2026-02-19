@@ -26,13 +26,13 @@ export default function Navbar() {
     ];
 
     return (
-        <nav className="fixed top-0 left-0 right-0 z-50 border-b border-white/5 bg-slate-950/70 backdrop-blur-xl supports-[backdrop-filter]:bg-slate-950/60">
-            <div className="container mx-auto px-6 h-16 flex items-center justify-between">
+        <nav className="fixed top-0 left-0 right-0 z-50 border-b border-white/5 bg-slate-950/70 backdrop-blur-xl supports-[backdrop-filter]:bg-slate-950/60 transition-all duration-300">
+            <div className="max-w-7xl mx-auto px-4 md:px-6 h-16 flex items-center justify-between">
                 {/* Logo */}
                 <Link href="/" className="flex items-center gap-2 group relative">
                     <div className="absolute -inset-2 bg-cyan-500/20 rounded-full blur-lg opacity-0 group-hover:opacity-100 transition-opacity duration-500" />
                     <div className="relative w-10 h-10 flex items-center justify-center group-hover:scale-105 transition-transform drop-shadow-[0_0_15px_rgba(34,211,238,0.3)]">
-                        <Image src="/logo.png" alt="ContentHub" fill className="object-contain" />
+                        <Image src="/brand_logo.png" alt="ContentHub" fill className="object-contain" />
                     </div>
                     <span className="relative font-bold text-white tracking-tight text-lg">Content<span className="text-cyan-400">Hub</span></span>
                 </Link>

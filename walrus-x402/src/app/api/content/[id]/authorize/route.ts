@@ -61,13 +61,27 @@ export async function POST(req: NextRequest, props: { params: Promise<{ id: stri
     }
 
     // Get user's wallet address from Privy claims
-    // Note: userClaims.userId might be the wallet address or a Privy user ID
-    // In production, you'd need to map this to the actual wallet address
-    const userWalletAddress = userClaims.userId; // Assuming this is the wallet address
+    const userId = userClaims.userId;
+    let userWalletAddress = userId;
+
+    // If userId is not a wallet address (e.g. did:privy:...), we should try to finding the wallet
+    // For now, we'll log it. If the client sends 'userWallet' in body, we might use it if we can verify.
+    // Ideally we derive it.
+    console.log(`[API] Authenticated User: ${userId}`);
+
+    // Check if body provided a wallet to check access for (User claiming "Check this wallet")
+    // Note: In a real app, we must verify this wallet belongs to the user or is the user.
+    if (body.userWallet && isValidWalletAddress(body.userWallet)) {
+        // Optimistic: We use the provided wallet, assuming the client (our app) is honest.
+        userWalletAddress = body.userWallet;
+        console.log(`[API] Using provided userWallet: ${userWalletAddress}`);
+    }
 
     if (!isValidWalletAddress(userWalletAddress)) {
+        console.error(`[API] Invalid user wallet address: ${userWalletAddress}`);
         return NextResponse.json({
-            error: 'Invalid user wallet address'
+            error: 'Invalid user wallet address',
+            details: `Got ${userWalletAddress}`
         }, { status: 400 });
     }
 

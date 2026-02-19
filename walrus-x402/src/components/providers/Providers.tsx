@@ -5,6 +5,7 @@ import { baseSepolia } from 'viem/chains';
 import { WagmiProvider, createConfig } from '@privy-io/wagmi';
 import { http } from 'wagmi';
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
+import { Toaster } from 'sonner';
 
 const queryClient = new QueryClient();
 
@@ -41,6 +42,7 @@ export default function Providers({ children }: { children: React.ReactNode }) {
             <QueryClientProvider client={queryClient}>
                 <WagmiProvider config={wagmiConfig}>
                     {children}
+                    <Toaster position="top-center" richColors theme="dark" />
                 </WagmiProvider>
             </QueryClientProvider>
         </PrivyProvider>

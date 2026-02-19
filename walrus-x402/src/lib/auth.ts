@@ -59,6 +59,20 @@ export async function verifyPrivyToken(req: NextRequest) {
   }
 }
 
+export async function getUserWallet(userId: string): Promise<string | null> {
+  if (!privy) {
+    if (!IS_PRODUCTION) return '0xcd3b766ccdd6ae72614d74d71550c39783ce4dee'; // Mock wallet
+    return null;
+  }
+  try {
+    const user = await privy.getUser(userId);
+    return user.wallet?.address || null;
+  } catch (e) {
+    console.error('[AUTH] Failed to fetch user profile:', e);
+    return null;
+  }
+}
+
 export function unauthorizedResponse() {
   return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
 }

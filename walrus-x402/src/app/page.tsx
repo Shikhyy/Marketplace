@@ -2,118 +2,194 @@
 
 import { usePrivy } from '@privy-io/react-auth';
 import Link from 'next/link';
-import { ArrowRight, Play, Globe, ShieldCheck } from 'lucide-react';
+import { ArrowRight, Play, Globe, ShieldCheck, Zap } from 'lucide-react';
 import { motion } from 'framer-motion';
+import Hero from '@/components/landing/Hero';
 import FeaturedCreators from '@/components/FeaturedCreators';
+import { RollingText } from '@/components/ui/skiper-ui/RollingText';
+import { AppleStyleFeature } from '@/components/ui/skiper-ui/AppleStyleFeature';
+import { ProjectsShowcase } from '@/components/ui/skiper-ui/ProjectsShowcase';
+import { useState, useEffect } from 'react';
+import { createPublicClient, http } from 'viem';
+import { baseSepolia } from 'viem/chains';
+import { CREATOR_HUB_ADDRESS, CREATOR_HUB_ABI, WALLET_ADDRESS_LENGTH } from '@/config/constants';
+
+interface ShowcaseProject {
+  id: string;
+  title: string;
+  category: string;
+  description: string;
+  image: string;
+}
 
 export default function Home() {
   const { login, authenticated } = usePrivy();
+  const [showcaseProjects, setShowcaseProjects] = useState<ShowcaseProject[]>([]);
+
+  useEffect(() => {
+    const fetchLatestContent = async () => {
+      try {
+        const client = createPublicClient({
+          chain: baseSepolia,
+          transport: http()
+        });
+
+        // @ts-ignore
+        const rawVideos: any[] = await client.readContract({
+          address: CREATOR_HUB_ADDRESS as `0x${string}`,
+          abi: CREATOR_HUB_ABI,
+          functionName: 'getLatestVideos',
+          args: [5] // Fetch last 5 videos
+        });
+
+        if (rawVideos && rawVideos.length > 0) {
+          const mappedProjects: ShowcaseProject[] = rawVideos.map((video: any, index: number) => ({
+            id: video.videoCID || `vid-${index}`,
+            title: video.title || 'Untitled Video',
+            category: "Original",
+            description: `Stream now on x402. Uploaded by ${video.uploader?.slice(0, 6)}...${video.uploader?.slice(-4)}`,
+            image: video.thumbnailCID
+              ? `https://gateway.lighthouse.storage/ipfs/${video.thumbnailCID}`
+              : "https://images.unsplash.com/photo-1618005182384-a83a8bd57fbe?q=80&w=2564&auto=format&fit=crop"
+          }));
+
+          // Only take the first 4 for the showcase to keep it clean
+          setShowcaseProjects(mappedProjects.slice(0, 4));
+        } else {
+          // Fallback if no content exists yet (empty state)
+          setShowcaseProjects([]);
+        }
+
+      } catch (error) {
+        console.error("Error fetching latest content:", error);
+      }
+    };
+
+    fetchLatestContent();
+  }, []);
+
+
+  const features = [
+    {
+      title: "Decentralized Storage",
+      description: "Your content lives forever on Lighthouse & IPFS. Censorship-resistant, permanent, and user-owned.",
+      icon: <Globe className="w-6 h-6 text-cyan-400" />,
+      colSpan: 2 as const,
+      content: (
+        <div className="mt-8 p-6 rounded-2xl bg-black/40 border border-white/5 relative overflow-hidden h-64 flex items-center justify-center group-hover:border-cyan-500/30 transition-colors w-full">
+          <div className="absolute inset-0 bg-[url('https://beebom.com/wp-content/uploads/2021/11/Web-3.0-architecture.jpg?w=640')] bg-cover opacity-20 bg-center" />
+          <div className="relative z-10 text-cyan-400 font-mono text-sm flex items-center gap-2 px-4 py-2 rounded-full bg-black/50 border border-cyan-500/30 backdrop-blur-md">
+            <span className="w-2 h-2 rounded-full bg-cyan-500 animate-pulse" />
+            storage://lighthouse_node_01
+            <span className="text-xs text-slate-500 ml-2">| 100% Uptime</span>
+          </div>
+        </div>
+      )
+    },
+    {
+      title: "x402 Payments",
+      description: "Programmable USDC streams on Base. Pay once, access forever. No subscription fatigue.",
+      icon: <ShieldCheck className="w-6 h-6 text-indigo-400" />,
+      colSpan: 1 as const,
+    },
+    {
+      title: "Premium Player",
+      description: "High-fidelity, token-gated streaming. Only verified subscribers can decrypt/watch.",
+      icon: <Play className="w-6 h-6 text-purple-400" />,
+      colSpan: 1 as const,
+    },
+    {
+      title: "Creator Economy 2.0",
+      description: "Keep 100% of your revenue. You own the platform. No middlemen fees on memberships.",
+      icon: <Zap className="w-6 h-6 text-yellow-400" />,
+      colSpan: 2 as const,
+      content: (
+        <div className="grid grid-cols-2 gap-4 mt-8 w-full max-w-2xl mx-auto">
+          <div className="p-6 rounded-2xl bg-gradient-to-br from-green-500/10 to-emerald-500/5 border border-green-500/20 text-center relative group overflow-hidden">
+            <div className="absolute inset-0 bg-green-500/10 blur-xl opacity-0 group-hover:opacity-100 transition-opacity" />
+            <div className="text-4xl font-black text-green-400 mb-1 relative z-10">100%</div>
+            <div className="text-sm font-medium text-green-200/60 uppercase tracking-widest relative z-10">Revenue Share</div>
+          </div>
+          <div className="p-6 rounded-2xl bg-slate-900/50 border border-white/5 text-center grayscale opacity-50 relative">
+            <div className="text-4xl font-black text-white mb-1">0%</div>
+            <div className="text-sm font-medium text-slate-500 uppercase tracking-widest">Platform Fees</div>
+          </div>
+        </div>
+      )
+    },
+  ];
 
   return (
-    <div className="relative flex flex-col gap-32 pb-20 overflow-hidden">
-      {/* Global Background Effects */}
-      <div className="fixed inset-0 bg-slate-950 -z-50" />
-      <div className="fixed inset-0 bg-grid-white/[0.02] bg-[size:50px_50px] -z-40 pointer-events-none masking-gradient" />
-      <div className="fixed top-0 left-1/2 -translate-x-1/2 w-[1000px] h-[600px] bg-indigo-500/20 rounded-full blur-[120px] -z-40 opacity-50 pointer-events-none mix-blend-screen" />
+    <div className="relative flex flex-col gap-32 pb-20 overflow-hidden font-sans">
 
       {/* Hero Section */}
-      <section className="relative min-h-[85vh] flex flex-col items-center justify-center text-center space-y-12 px-4 pt-20">
+      <Hero />
 
-        <motion.div
-          initial={{ opacity: 0, scale: 0.9 }}
-          animate={{ opacity: 1, scale: 1 }}
-          transition={{ duration: 0.8, ease: [0.16, 1, 0.3, 1] }}
-          className="relative group"
-        >
-          <div className="absolute inset-0 bg-cyan-500/30 blur-[40px] rounded-full -z-10 animate-pulse-slow group-hover:bg-cyan-400/40 transition-colors duration-500" />
-          <div className="inline-flex items-center gap-2 px-6 py-2.5 rounded-full bg-slate-900/60 border border-cyan-500/20 text-cyan-300 text-sm font-semibold backdrop-blur-xl shadow-lg shadow-cyan-900/20 ring-1 ring-white/5 group-hover:scale-105 transition-transform duration-300 cursor-default">
-            <span className="relative flex h-2.5 w-2.5">
-              <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-cyan-400 opacity-75"></span>
-              <span className="relative inline-flex rounded-full h-2.5 w-2.5 bg-cyan-500 box-shadow-[0_0_12px_rgba(34,211,238,0.8)]"></span>
-            </span>
-            Live on Base Sepolia
+      {/* Revenue Comparison Section */}
+      <section className="relative z-10 max-w-7xl mx-auto px-4 w-full pt-20">
+        <div className="grid grid-cols-1 md:grid-cols-2 gap-12 items-center">
+          <div className="space-y-6">
+            <h2 className="text-4xl md:text-5xl font-bold text-white tracking-tight">Stop Paying the <span className="text-red-500">Platform Tax</span>.</h2>
+            <p className="text-slate-400 text-lg leading-relaxed">
+              Legacy platforms take up to 45% of your hard-earned revenue. On x402, you keep what you earn.
+            </p>
+            <div className="flex flex-col gap-4">
+              <div className="flex items-center justify-between p-4 rounded-xl bg-red-500/10 border border-red-500/20">
+                <span className="font-semibold text-red-200">YouTube / Twitch</span>
+                <span className="font-bold text-red-500">~55% Share</span>
+              </div>
+              <div className="flex items-center justify-between p-4 rounded-xl bg-cyan-500/10 border border-cyan-500/20 shadow-[0_0_30px_-10px_rgba(34,211,238,0.3)]">
+                <span className="font-semibold text-cyan-200">Walrus x402</span>
+                <span className="font-bold text-cyan-400">100% Share</span>
+              </div>
+            </div>
           </div>
-        </motion.div>
 
-        <motion.div
-          initial={{ opacity: 0, y: 30 }}
-          animate={{ opacity: 1, y: 0 }}
-          transition={{ duration: 0.8, delay: 0.2 }}
-          className="space-y-8 max-w-6xl mx-auto"
-        >
-          <h1 className="text-6xl md:text-8xl lg:text-9xl font-extrabold tracking-tighter text-white leading-[0.9]">
-            Stream. Read. <br className="hidden md:block" />
-            <span className="text-transparent bg-clip-text bg-gradient-to-r from-cyan-400 via-indigo-400 to-purple-500 animate-gradient-x">Own.</span>
-          </h1>
-          <p className="text-xl md:text-2xl text-slate-400/80 max-w-3xl mx-auto leading-relaxed font-light">
-            The first decentralized content marketplace where creators keep <span className="text-white font-medium">100%</span> of revenue and users truly own their library.
-          </p>
-        </motion.div>
-
-        <motion.div
-          initial={{ opacity: 0, y: 30 }}
-          animate={{ opacity: 1, y: 0 }}
-          transition={{ duration: 0.8, delay: 0.4 }}
-          className="flex flex-col sm:flex-row items-center gap-6"
-        >
-          {authenticated ? (
-            <Link
-              href="/explore"
-              className="px-10 py-5 rounded-full bg-white text-slate-950 font-bold text-lg hover:bg-cyan-50 transition-all flex items-center gap-3 shadow-[0_0_50px_-10px_rgba(255,255,255,0.4)] hover:shadow-[0_0_70px_-10px_rgba(255,255,255,0.5)] hover:scale-105"
-            >
-              Start Exploring <ArrowRight className="w-5 h-5" />
-            </Link>
-          ) : (
-            <button
-              onClick={login}
-              className="group relative px-10 py-5 rounded-full bg-cyan-500 hover:bg-cyan-400 text-slate-950 font-bold text-lg transition-all shadow-[0_0_50px_-10px_rgba(34,211,238,0.5)] hover:shadow-[0_0_70px_-10px_rgba(34,211,238,0.6)] flex items-center gap-3 hover:scale-105"
-            >
-              <span className="relative z-10 flex items-center gap-3">Connect Wallet <ArrowRight className="w-5 h-5 group-hover:translate-x-1 transition-transform" /></span>
-            </button>
-          )}
-          <Link
-            href="/creators"
-            className="px-10 py-5 rounded-full bg-slate-950/30 border border-white/10 hover:border-white/20 hover:bg-white/5 text-white font-medium transition-all backdrop-blur-md flex items-center gap-2"
-          >
-            For Creators
-          </Link>
-        </motion.div>
+          {/* Visual Chart */}
+          <div className="h-[400px] rounded-3xl bg-slate-900/50 border border-white/5 relative overflow-hidden flex items-end justify-center gap-8 p-10">
+            <div className="w-1/3 h-[55%] bg-red-500/20 rounded-t-xl border-t border-x border-red-500/30 relative group">
+              <div className="absolute -top-10 left-0 right-0 text-center text-red-400 font-bold">Old Way</div>
+            </div>
+            <div className="w-1/3 h-full bg-cyan-500/20 rounded-t-xl border-t border-x border-cyan-500/30 relative group shadow-[0_0_50px_-10px_rgba(34,211,238,0.2)]">
+              <div className="absolute -top-10 left-0 right-0 text-center text-cyan-400 font-bold">New Way</div>
+              <div className="absolute inset-0 bg-gradient-to-t from-cyan-500/10 to-transparent" />
+            </div>
+          </div>
+        </div>
       </section>
 
-      {/* Features Grid */}
-      <section className="max-w-7xl mx-auto px-6 grid grid-cols-1 md:grid-cols-3 gap-8 relative z-10">
-        {[
-          {
-            icon: <Globe className="w-8 h-8 text-cyan-400" />,
-            title: "Decentralized Storage",
-            desc: "Content is stored on Walrus & IPFS, ensuring permanence, lower costs, and zero censorship."
-          },
-          {
-            icon: <ShieldCheck className="w-8 h-8 text-indigo-400" />,
-            title: "x402 Payments",
-            desc: "Programmable USDC subscription streams on Base. Pay once, access forever with on-chain guarantees."
-          },
-          {
-            icon: <Play className="w-8 h-8 text-purple-400" />,
-            title: "Premium Player",
-            desc: "High-fidelity, token-gated streaming. Only verified subscribers can decrypt and view exclusive content."
-          }
-        ].map((feature, i) => (
-          <motion.div
-            key={i}
-            initial={{ opacity: 0, y: 40 }}
-            whileInView={{ opacity: 1, y: 0 }}
-            viewport={{ once: true, margin: "-100px" }}
-            transition={{ delay: i * 0.1, duration: 0.5, ease: "easeOut" }}
-            className="p-10 rounded-[2.5rem] bg-slate-900/40 border border-white/5 hover:border-white/10 transition-all duration-300 group backdrop-blur-md hover:-translate-y-2 hover:shadow-2xl hover:shadow-cyan-900/10"
-          >
-            <div className="mb-8 p-5 rounded-2xl bg-slate-950/50 w-fit group-hover:scale-110 transition-transform duration-300 shadow-lg shadow-black/20 border border-white/5 group-hover:border-cyan-500/20 ring-1 ring-white/5">
-              {feature.icon}
+      {/* How It Works Section */}
+      <section className="relative z-10 max-w-7xl mx-auto px-4 py-20">
+        <div className="text-center mb-16 space-y-4">
+          <h2 className="text-3xl md:text-5xl font-bold text-white tracking-tight">How it Works</h2>
+          <p className="text-slate-400 max-w-2xl mx-auto text-lg">Start earning in minutes, not months.</p>
+        </div>
+
+        <div className="grid grid-cols-1 md:grid-cols-3 gap-8">
+          {[
+            { step: "01", title: "Connect Wallet", desc: "Sign in with your wallet. No email or password needed." },
+            { step: "02", title: "Upload Content", desc: "Store your videos permanently on Lighthouse & IPFS." },
+            { step: "03", title: "Earn Streams", desc: "Get paid instantly in USDC for every second streamed." }
+          ].map((item, i) => (
+            <div key={i} className="relative group p-8 rounded-3xl bg-slate-900/50 border border-white/5 hover:border-cyan-500/30 transition-all hover:-translate-y-2">
+              <div className="absolute top-0 right-0 p-6 text-6xl font-black text-white/5 group-hover:text-cyan-500/10 transition-colors select-none">{item.step}</div>
+              <div className="w-12 h-12 rounded-full bg-cyan-500/10 flex items-center justify-center mb-6 border border-cyan-500/20 group-hover:scale-110 transition-transform">
+                <div className="w-4 h-4 rounded-full bg-cyan-500" />
+              </div>
+              <h3 className="text-xl font-bold text-white mb-3">{item.title}</h3>
+              <p className="text-slate-400 leading-relaxed">{item.desc}</p>
             </div>
-            <h3 className="text-2xl font-bold text-white mb-4 group-hover:text-cyan-400 transition-colors duration-300">{feature.title}</h3>
-            <p className="text-slate-400 leading-relaxed text-lg font-light group-hover:text-slate-300 transition-colors">{feature.desc}</p>
-          </motion.div>
-        ))}
+          ))}
+        </div>
+      </section>
+
+      {/* Skiper UI Features Section */}
+      <section className="relative z-10">
+        <div className="text-center mb-16 space-y-4">
+          <h2 className="text-3xl md:text-5xl font-bold text-white tracking-tight">Why x402?</h2>
+          <p className="text-slate-400 max-w-2xl mx-auto text-lg">Built on the bleeding edge of Web3 technology.</p>
+        </div>
+        <AppleStyleFeature features={features} />
       </section>
 
       {/* Featured Creators Section */}
@@ -121,33 +197,71 @@ export default function Home() {
         <FeaturedCreators />
       </div>
 
-      {/* Content Teaser */}
-      <section className="max-w-7xl mx-auto px-6 relative z-10">
-        <div className="relative rounded-[3rem] overflow-hidden bg-slate-900 aspect-video md:aspect-[2/1] flex items-center justify-center border border-white/10 group shadow-2xl shadow-indigo-900/20">
-          {/* Dynamic Background */}
-          <div className="absolute inset-0 bg-[url('https://images.unsplash.com/photo-1618005182384-a83a8bd57fbe?q=80&w=2564&auto=format&fit=crop')] bg-cover bg-center opacity-30 blur-md scale-105 group-hover:scale-100 transition-transform duration-[10s]" />
-          <div className="absolute inset-0 bg-gradient-to-tr from-slate-950 via-slate-950/60 to-transparent" />
-
-          <motion.div
-            initial={{ opacity: 0, scale: 0.95 }}
-            whileInView={{ opacity: 1, scale: 1 }}
-            viewport={{ once: true }}
-            className="relative z-10 text-center space-y-8 p-12 max-w-4xl"
-          >
-            <h2 className="text-5xl md:text-7xl font-bold text-white tracking-tighter leading-none">
-              Originals.<br />
-              <span className="text-transparent bg-clip-text bg-gradient-to-r from-white to-slate-500">Only on ContentHub.</span>
+      {/* Skiper UI Showcase Section */}
+      {showcaseProjects.length > 0 && (
+        <section className="relative z-10 space-y-12">
+          <div className="text-center space-y-4">
+            <h2 className="text-4xl md:text-6xl font-bold text-white tracking-tighter">
+              Originals. <span className="text-transparent bg-clip-text bg-gradient-to-r from-purple-400 to-pink-600">Only on x402.</span>
             </h2>
-            <p className="text-slate-300 max-w-lg mx-auto text-xl font-light">
-              Join thousands of users discovering the next generation of Web3 creators.
-            </p>
-            <Link
-              href="/explore"
-              className="inline-flex items-center gap-3 px-10 py-5 rounded-full bg-white/10 hover:bg-white/20 backdrop-blur-md text-white font-bold border border-white/10 transition-all hover:scale-105"
-            >
-              Browse Library <ArrowRight className="w-5 h-5" />
-            </Link>
-          </motion.div>
+          </div>
+          <ProjectsShowcase projects={showcaseProjects} />
+        </section>
+      )}
+
+      {/* Call to Action */}
+      <section className="relative w-full py-32 px-4 overflow-hidden">
+        <div className="max-w-7xl mx-auto relative z-10">
+          <div className="relative p-20 md:p-32 rounded-[3.5rem] bg-slate-900 border border-white/10 overflow-hidden group">
+            {/* Dynamic Background */}
+            <div className="absolute inset-0 bg-[radial-gradient(circle_at_50%_120%,rgba(100,50,255,0.2),transparent_70%)]" />
+            <div className="absolute inset-0 bg-[url('https://grainy-gradients.vercel.app/noise.svg')] opacity-20 mix-blend-overlay" />
+
+            {/* Warp Speed Lines - CSS Trick */}
+            <div className="absolute inset-0 opacity-20 group-hover:opacity-40 transition-opacity duration-1000">
+              <div className="absolute top-0 left-1/4 w-[1px] h-full bg-gradient-to-b from-transparent via-cyan-500 to-transparent opacity-50 blur-[1px]" />
+              <div className="absolute top-0 right-1/4 w-[1px] h-full bg-gradient-to-b from-transparent via-purple-500 to-transparent opacity-50 blur-[1px]" />
+              <div className="absolute top-0 left-1/2 w-[1px] h-full bg-gradient-to-b from-transparent via-white to-transparent opacity-30 blur-[2px]" />
+            </div>
+
+            <div className="relative z-10 flex flex-col items-center text-center space-y-10">
+              <motion.div
+                initial={{ opacity: 0, scale: 0.9 }}
+                whileInView={{ opacity: 1, scale: 1 }}
+                viewport={{ once: true }}
+                transition={{ duration: 0.8 }}
+              >
+                <h2 className="text-5xl md:text-8xl font-serif text-white tracking-tight leading-[0.9] mb-4">
+                  Ready to join <br />
+                  <span className="text-transparent bg-clip-text bg-gradient-to-b from-white to-slate-400 italic">the revolution?</span>
+                </h2>
+              </motion.div>
+
+              <motion.p
+                initial={{ opacity: 0, y: 20 }}
+                whileInView={{ opacity: 1, y: 0 }}
+                viewport={{ once: true }}
+                transition={{ duration: 0.8, delay: 0.2 }}
+                className="text-xl md:text-2xl text-slate-400 max-w-2xl mx-auto font-light"
+              >
+                Start streaming, collecting, and earning today. <br /> The future of content is here.
+              </motion.p>
+
+              <motion.div
+                initial={{ opacity: 0, y: 20 }}
+                whileInView={{ opacity: 1, y: 0 }}
+                viewport={{ once: true }}
+                transition={{ duration: 0.8, delay: 0.4 }}
+              >
+                <Link
+                  href="/explore"
+                  className="relative group inline-flex items-center gap-4 px-12 py-6 rounded-full bg-white text-slate-950 font-bold text-xl transition-all hover:scale-105 shadow-[0_0_50px_-10px_rgba(255,255,255,0.4)] hover:shadow-[0_0_80px_-20px_rgba(255,255,255,0.6)]"
+                >
+                  Launch App <Zap className="w-6 h-6 fill-current group-hover:rotate-12 transition-transform" />
+                </Link>
+              </motion.div>
+            </div>
+          </div>
         </div>
       </section>
 

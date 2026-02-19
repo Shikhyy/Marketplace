@@ -1,6 +1,7 @@
 'use client';
 
 import { useState, use, useEffect } from 'react';
+import { toast } from 'sonner';
 import { Shield, Lock, Play, CheckCircle, Upload, Wallet, Loader2 } from 'lucide-react';
 import Link from 'next/link';
 import { usePrivy, useWallets } from '@privy-io/react-auth';
@@ -8,7 +9,7 @@ import { useSubscription } from '@/hooks/useSubscription';
 import { useX402 } from '@/hooks/useX402';
 import { createPublicClient, createWalletClient, custom, formatEther, http } from 'viem';
 import { baseSepolia } from 'viem/chains';
-import { CREATOR_HUB_ADDRESS, CREATOR_HUB_ABI, NEXT_PUBLIC_IPFS_GATEWAY } from '@/config/constants';
+import { CREATOR_HUB_ADDRESS, CREATOR_HUB_ABI, NEXT_PUBLIC_IPFS_GATEWAY, USDC_SEPOLIA_ADDRESS, MOCK_PRICE_USDC } from '@/config/constants';
 import { motion } from 'framer-motion';
 
 const GATEWAY = NEXT_PUBLIC_IPFS_GATEWAY || "https://gateway.lighthouse.storage/ipfs/";
@@ -145,33 +146,30 @@ export default function CreatorProfile(props: { params: Promise<{ address: strin
         if (params.address) fetchData();
     }, [params.address]);
 
-    const { handlePayment, paymentState, loading: paymentLoading } = useX402();
+    const { handlePayment, paymentState } = useX402();
+    const paymentLoading = paymentState !== 'idle' && paymentState !== 'success' && paymentState !== 'error';
 
     const handleSubscribe = async () => {
         if (!authenticated || !wallets.length) {
-            alert("Please connect your wallet first.");
+            toast.error("Please connect your wallet first.");
             return;
         }
 
-        setIsSubscribing(true);
         try {
-            // Direct Payment to Creator using useX402
-            // Currently subscriptions are priced in ETH (NATIVE) based on contract 'price'
-            // We read the price from the chain but send it directly to the creator
+            const amountToPay = subscriptionPrice; // Use actual price from contract
 
             const txHash = await handlePayment({
                 chainId: baseSepolia.id,
-                tokenAddress: '0x0000000000000000000000000000000000000000', // Native ETH
-                amount: subscriptionPrice.toString(),
-                recipient: params.address, // Direct to Creator
+                tokenAddress: '0x0000000000000000000000000000000000000000', // FORCE ETH
+                amount: amountToPay.toString(),
+                recipient: params.address,
                 paymentParameter: {
-                    minerOf: params.address // Metadata for subscription intent
+                    minerOf: params.address
                 }
             });
 
             console.log("Subscription tx:", txHash);
 
-            // Save Proof to Local Storage
             if (txHash && user?.wallet?.address) {
                 const storageKey = `subscriptions_${user.wallet.address}`;
                 const currentSubs = JSON.parse(localStorage.getItem(storageKey) || '{}');
@@ -183,18 +181,18 @@ export default function CreatorProfile(props: { params: Promise<{ address: strin
 
                 localStorage.setItem(storageKey, JSON.stringify(currentSubs));
                 console.log("[Subscription] Saved proof locally:", txHash);
+
+                toast.success("Subscription activated!", {
+                    description: "You now have access to premium content."
+                });
+                refresh();
             }
 
-            alert("Subscription activated!");
-
-            // Immediate refresh
-            refresh();
-            setIsSubscribing(false);
-
-        } catch (error) {
+        } catch (error: any) {
             console.error("Subscription failed:", error);
-            // alert("Subscription failed. See console for details.");
-            setIsSubscribing(false);
+            toast.error("Subscription failed", {
+                description: error.message || "Please try again."
+            });
         }
     };
 
@@ -276,13 +274,33 @@ export default function CreatorProfile(props: { params: Promise<{ address: strin
                                     ) : (
                                         <button
                                             onClick={handleSubscribe}
-                                            disabled={isSubscribing || subLoading}
-                                            className="px-8 py-4 rounded-xl bg-white text-slate-950 font-bold hover:bg-slate-200 transition-all flex items-col gap-1 disabled:opacity-50"
+                                            disabled={isSubscribing || subLoading || (paymentState !== 'idle' && paymentState !== 'error')}
+                                            className={`relative group px-8 py-4 rounded-xl font-bold transition-all flex items-center gap-3 disabled:opacity-50 disabled:cursor-not-allowed overflow-hidden
+                                                ${paymentState === 'error'
+                                                    ? 'bg-red-500/10 text-red-400 border border-red-500/20 hover:bg-red-500/20'
+                                                    : 'bg-white text-black hover:scale-105 hover:shadow-[0_0_40px_-10px_rgba(255,255,255,0.5)]'}`}
                                         >
-                                            <span>Subscribe</span>
-                                            <span className="text-xs font-normal opacity-60 ml-1">
-                                                for {formatEther(subscriptionPrice)} ETH
-                                            </span>
+                                            <div className="absolute inset-0 bg-gradient-to-r from-transparent via-white/40 to-transparent translate-x-[-200%] group-hover:translate-x-[200%] transition-transform duration-1000" />
+
+                                            {paymentLoading || (paymentState !== 'idle' && paymentState !== 'error') ? (
+                                                <>
+                                                    <Loader2 className="w-5 h-5 animate-spin" />
+                                                    <span className="text-sm font-medium">
+                                                        {paymentState === 'preparing' && 'Preparing...'}
+                                                        {paymentState === 'signing' && 'Check Wallet...'}
+                                                        {paymentState === 'confirming' && 'Confirming...'}
+                                                        {paymentState === 'verifying' && 'Verifying...'}
+                                                        {paymentState === 'success' && 'Success!'}
+                                                    </span>
+                                                </>
+                                            ) : (
+                                                <>
+                                                    <span className="relative z-10">{paymentState === 'error' ? 'Retry' : 'Subscribe'}</span>
+                                                    <span className="relative z-10 px-2 py-0.5 bg-black/5 rounded-md text-xs font-medium opacity-60">
+                                                        {formatEther(subscriptionPrice)} ETH
+                                                    </span>
+                                                </>
+                                            )}
                                         </button>
                                     )}
                                 </div>
@@ -290,9 +308,7 @@ export default function CreatorProfile(props: { params: Promise<{ address: strin
                         </div>
                     </div>
                 </div>
-            </div>
-
-            <div className="max-w-7xl mx-auto px-4 md:px-8 mt-12">
+            </div> <div className="max-w-7xl mx-auto px-4 md:px-8 mt-12">
                 <div className="flex items-center justify-between mb-8">
                     <h2 className="text-2xl font-bold text-white flex items-center gap-2">
                         <Play className="w-5 h-5 text-cyan-500" />
@@ -359,7 +375,7 @@ export default function CreatorProfile(props: { params: Promise<{ address: strin
                                             {item.premium && (
                                                 <span className="flex items-center gap-1 text-indigo-400">
                                                     <Lock className="w-3 h-3" />
-                                                    {item.price ? (Number(item.price) / 1000000).toFixed(2) : ''} USDC
+                                                    {item.price ? parseFloat(formatEther(BigInt(item.price))).toLocaleString(undefined, { maximumFractionDigits: 6 }) : ''} ETH
                                                 </span>
                                             )}
                                         </div>
@@ -388,6 +404,6 @@ export default function CreatorProfile(props: { params: Promise<{ address: strin
                     </div>
                 )}
             </div>
-        </div>
+        </div >
     );
 }

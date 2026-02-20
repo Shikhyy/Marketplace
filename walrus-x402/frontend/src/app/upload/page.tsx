@@ -83,7 +83,7 @@ export default function UploadPage() {
 
             // 2. Set Price (if provided)
             if (subPrice && parseFloat(subPrice) > 0) {
-                const priceWei = parseUnits(subPrice, 18); // ETH uses 18 decimals
+                const priceWei = parseUnits(subPrice, 6); // USDC uses 6 decimals
                 const hash2 = await walletClient.writeContract({
                     address: CREATOR_HUB_ADDRESS as `0x${string}`,
                     abi: CREATOR_HUB_ABI,
@@ -289,7 +289,7 @@ export default function UploadPage() {
                             />
                         </div>
                         <div>
-                            <label className="text-sm font-medium text-slate-300 ml-1 mb-1 block">Monthly Subscription (ETH) <span className="text-slate-500 text-xs font-normal">(Optional)</span></label>
+                            <label className="text-sm font-medium text-slate-300 ml-1 mb-1 block">Monthly Subscription (USDC) <span className="text-slate-500 text-xs font-normal">(Optional)</span></label>
                             <div className="relative">
                                 <Coins className="absolute left-4 top-1/2 -translate-y-1/2 w-5 h-5 text-slate-500" />
                                 <input

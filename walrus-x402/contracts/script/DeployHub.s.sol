@@ -12,7 +12,8 @@ contract DeployHub is Script {
         
         vm.startBroadcast(deployerPrivateKey);
 
-        CreatorHub hub = new CreatorHub();
+        address usdcSepolia = 0x036CbD53842c5426634e7929541eC2318f3dCF7e;
+        CreatorHub hub = new CreatorHub(usdcSepolia);
         console.log("CreatorHub deployed to:", address(hub));
 
         vm.stopBroadcast();

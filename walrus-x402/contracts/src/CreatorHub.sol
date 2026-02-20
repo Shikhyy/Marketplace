@@ -2,7 +2,18 @@
 
 pragma solidity ^0.8.30;
 
+interface IERC20 {
+    function transferFrom(address sender, address recipient, uint256 amount) external returns (bool);
+    function transfer(address recipient, uint256 amount) external returns (bool);
+}
+
 contract CreatorHub {
+    IERC20 public usdcToken;
+
+    constructor(address _usdcToken) {
+        usdcToken = IERC20(_usdcToken);
+    }
+
     /* 
      * Video Showcase & Creator Registry Logic
      */
@@ -76,7 +87,7 @@ contract CreatorHub {
             name: _name,
             wallet: msg.sender,
             isRegistered: true,
-            subscriptionPrice: 0.001 ether, // Default price
+            subscriptionPrice: 5000000, // 5 USDC (6 decimals)
             subscriberCount: 0,
             totalEarnings: 0
         });
@@ -92,9 +103,9 @@ contract CreatorHub {
         emit SubscriptionPriceUpdated(msg.sender, _price);
     }
 
-    function subscribe(address _creator) external payable {
+    function subscribe(address _creator) external {
         require(cret[_creator].isRegistered, "Creator not registered");
-        require(msg.value >= cret[_creator].subscriptionPrice, "Insufficient payment");
+        uint256 price = cret[_creator].subscriptionPrice;
 
         uint256 currentExpiry = subscriptions[msg.sender][_creator];
         uint256 newExpiry;
@@ -107,34 +118,29 @@ contract CreatorHub {
 
         subscriptions[msg.sender][_creator] = newExpiry;
         
-        // Transfer funds to creator
-        (bool sent, ) = payable(_creator).call{value: msg.value}("");
-        require(sent, "Failed to send Ether");
+        // Transfer USDC to creator
+        require(usdcToken.transferFrom(msg.sender, _creator, price), "USDC transfer failed");
 
         // Update Stats
         cret[_creator].subscriberCount++;
-        cret[_creator].totalEarnings += msg.value;
+        cret[_creator].totalEarnings += price;
 
         emit Subscribed(msg.sender, _creator, newExpiry);
     }
 
-    function rentContent(uint256 _contentId) external payable {
+    function rentContent(uint256 _contentId) external {
         Content memory c = contents[_contentId];
         require(c.active, "Content not active");
         require(c.rentedPrice > 0, "Content not for rent");
         
-        // Check native ETH payment (ignoring ERC20 paymentToken for now to match current simple flow)
-        require(msg.value >= c.rentedPrice, "Insufficient payment");
-
         uint256 newExpiry = block.timestamp + 24 hours;
         rentals[msg.sender][_contentId] = newExpiry;
 
-        // Transfer funds to creator
-        (bool sent, ) = payable(c.creatorAddress).call{value: msg.value}("");
-        require(sent, "Failed to send Ether");
+        // Transfer USDC to creator
+        require(usdcToken.transferFrom(msg.sender, c.creatorAddress, c.rentedPrice), "USDC transfer failed");
 
         // Update Stats (Optional: add content specific earnings later)
-        cret[c.creatorAddress].totalEarnings += msg.value;
+        cret[c.creatorAddress].totalEarnings += c.rentedPrice;
 
         emit ContentRented(msg.sender, _contentId, newExpiry);
     }

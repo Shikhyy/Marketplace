@@ -118,28 +118,47 @@ export default function UploadPage() {
     const { handlePayment, paymentState } = useX402();
     // ...
 
-    const uploadToServer = async (file: File, paymentProof: string, uploadId: string) => {
-        // Bypass FormData by sending the raw binary stream directly
+    const uploadToServer = async (file: File, paymentProof: string, uploadId: string, label: string) => {
         const arrayBuffer = await file.arrayBuffer();
 
-        const res = await fetch('/api/upload/complete', {
-            method: 'POST',
-            headers: {
-                'x-payment': paymentProof,
-                'x-upload-id': uploadId,
-                'x-file-name': encodeURIComponent(file.name),
-                'Content-Type': 'application/octet-stream'
-            },
-            body: arrayBuffer
+        return new Promise<string>((resolve, reject) => {
+            const xhr = new XMLHttpRequest();
+            xhr.open('POST', '/api/upload/complete');
+
+            xhr.setRequestHeader('x-payment', paymentProof);
+            xhr.setRequestHeader('x-upload-id', uploadId);
+            xhr.setRequestHeader('x-file-name', encodeURIComponent(file.name));
+            xhr.setRequestHeader('Content-Type', 'application/octet-stream');
+
+            xhr.upload.onprogress = (event) => {
+                if (event.lengthComputable) {
+                    const percentComplete = Math.round((event.loaded / event.total) * 100);
+                    setProgress(`Uploading ${label}: ${percentComplete}%`);
+                }
+            };
+
+            xhr.onload = () => {
+                if (xhr.status >= 200 && xhr.status < 300) {
+                    try {
+                        const data = JSON.parse(xhr.responseText);
+                        setProgress(`Saving ${label} to IPFS...`);
+                        resolve(data.cid);
+                    } catch (e) {
+                        reject(new Error('Invalid response from server'));
+                    }
+                } else {
+                    try {
+                        const err = JSON.parse(xhr.responseText);
+                        reject(new Error(err.error || 'Upload failed'));
+                    } catch (e) {
+                        reject(new Error('Upload failed'));
+                    }
+                }
+            };
+
+            xhr.onerror = () => reject(new Error('Network error during upload'));
+            xhr.send(arrayBuffer);
         });
-
-        if (!res.ok) {
-            const err = await res.json().catch(() => ({}));
-            throw new Error(err.error || 'Upload failed due to server error');
-        }
-
-        const data = await res.json();
-        return data.cid;
     };
 
     const handleUpload = async () => {
@@ -174,9 +193,11 @@ export default function UploadPage() {
 
             setProgress('Uploading assets...');
 
-            // 3. Upload assets to Server (Lighthouse Proxy)
-            const videoCID = await uploadToServer(file, txHash, uploadId);
-            const thumbnailCID = await uploadToServer(thumbnail, txHash, uploadId);
+            setProgress('Uploading video: 0%');
+            const videoCID = await uploadToServer(file, txHash, uploadId, 'video');
+
+            setProgress('Uploading cover: 0%');
+            const thumbnailCID = await uploadToServer(thumbnail, txHash, uploadId, 'cover');
 
             const address = walletClient.account.address;
 
@@ -207,7 +228,7 @@ export default function UploadPage() {
 
                 const metadataBlob = new Blob([JSON.stringify(metadata)], { type: 'application/json' });
                 const metadataFile = new File([metadataBlob], 'metadata.json');
-                const metadataCID = await uploadToServer(metadataFile, txHash, uploadId);
+                const metadataCID = await uploadToServer(metadataFile, txHash, uploadId, 'metadata');
 
                 setProgress('Confirming transaction...');
 

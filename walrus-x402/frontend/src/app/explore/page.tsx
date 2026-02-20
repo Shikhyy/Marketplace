@@ -281,7 +281,7 @@ export default function ExplorePage() {
                                                 <div className="text-cyan-400 text-sm font-mono font-bold">
                                                     {item.paymentToken?.toLowerCase() === USDC_SEPOLIA_ADDRESS.toLowerCase()
                                                         ? `${parseFloat(formatUnits(BigInt(item.price), 6)).toLocaleString(undefined, { maximumFractionDigits: 2 })} USDC`
-                                                        : `${parseFloat(formatEther(BigInt(item.price))).toLocaleString(undefined, { maximumFractionDigits: 6 })} ETH`
+                                                        : `${parseFloat(formatUnits(BigInt(item.price), 6)).toLocaleString(undefined, { maximumFractionDigits: 6 })} USDC`
                                                     }
                                                 </div>
                                             )}

@@ -4,7 +4,7 @@ import Link from 'next/link';
 import { motion } from 'framer-motion';
 import { Users, ArrowRight, ShieldCheck, Upload, Wallet, Sparkles } from 'lucide-react';
 import { useCreators } from '@/hooks/useCreators';
-import { formatEther } from 'viem';
+import { formatUnits } from 'viem';
 
 const container = {
     hidden: { opacity: 0 },
@@ -108,7 +108,7 @@ export default function CreatorsPage() {
 
                                     <div className="flex items-center gap-3 mb-8">
                                         <div className="px-3 py-1 rounded-lg bg-indigo-500/10 text-indigo-300 text-xs font-bold border border-indigo-500/20">
-                                            {formatEther(creator.subscriptionPrice)} ETH / mo
+                                            {formatUnits(creator.subscriptionPrice, 6)} USDC / mo
                                         </div>
                                         {/* Optional: Add subscriber count if available */}
                                         {/* <div className="text-xs text-slate-500 flex items-center gap-1"><Users className="w-3 h-3"/> 1.2k Subs</div> */}

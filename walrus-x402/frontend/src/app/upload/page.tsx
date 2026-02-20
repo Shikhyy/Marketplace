@@ -119,19 +119,13 @@ export default function UploadPage() {
     // ...
 
     const uploadToServer = async (file: File, paymentProof: string, uploadId: string) => {
-<<<<<<< HEAD:walrus-x402/frontend/src/app/upload/page.tsx
         // Bypass FormData by sending the raw binary stream directly
         const arrayBuffer = await file.arrayBuffer();
-=======
-        const formData = new FormData();
-        formData.append('file', file);
->>>>>>> origin/main:walrus-x402/src/app/upload/page.tsx
 
         const res = await fetch('/api/upload/complete', {
             method: 'POST',
             headers: {
                 'x-payment': paymentProof,
-<<<<<<< HEAD:walrus-x402/frontend/src/app/upload/page.tsx
                 'x-upload-id': uploadId,
                 'x-file-name': encodeURIComponent(file.name),
                 'Content-Type': 'application/octet-stream'
@@ -142,16 +136,6 @@ export default function UploadPage() {
         if (!res.ok) {
             const err = await res.json().catch(() => ({}));
             throw new Error(err.error || 'Upload failed due to server error');
-=======
-                'x-upload-id': uploadId
-            },
-            body: formData
-        });
-
-        if (!res.ok) {
-            const err = await res.json();
-            throw new Error(err.error || 'Upload failed');
->>>>>>> origin/main:walrus-x402/src/app/upload/page.tsx
         }
 
         const data = await res.json();
@@ -182,12 +166,8 @@ export default function UploadPage() {
                 chainId: initData.chainId,
                 tokenAddress: initData.tokenAddress,
                 amount: initData.amount,
-<<<<<<< HEAD:walrus-x402/frontend/src/app/upload/page.tsx
                 recipient: initData.recipient,
                 paymentParameter: initData.paymentParameter
-=======
-                recipient: initData.recipient
->>>>>>> origin/main:walrus-x402/src/app/upload/page.tsx
             });
 
             if (!txHash) throw new Error("Payment failed");

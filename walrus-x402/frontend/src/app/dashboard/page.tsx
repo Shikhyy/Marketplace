@@ -6,11 +6,12 @@ import { CREATOR_HUB_ADDRESS, CREATOR_HUB_ABI, NEXT_PUBLIC_IPFS_GATEWAY } from '
 import Link from 'next/link';
 import { motion } from 'framer-motion';
 import { Loader2, Users, DollarSign, Video, Settings, Upload } from 'lucide-react';
-import { formatEther, parseEther } from 'viem';
+import { formatUnits, parseUnits } from 'viem';
 
 // Helper to format currency
 const formatCurrency = (amount: bigint) => {
-    return parseFloat(formatEther(amount)).toFixed(4);
+    if (!amount) return '0.0000';
+    return parseFloat(formatUnits(amount, 6)).toFixed(4);
 };
 
 export default function DashboardPage() {
@@ -63,7 +64,7 @@ export default function DashboardPage() {
                 address: CREATOR_HUB_ADDRESS,
                 abi: CREATOR_HUB_ABI,
                 functionName: 'setSubscriptionPrice',
-                args: [parseEther(newPrice)]
+                args: [parseUnits(newPrice, 6)]
             });
         } catch (error) {
             console.error("Error updating price:", error);
@@ -156,7 +157,7 @@ export default function DashboardPage() {
                         </div>
                         <h3 className="text-lg font-bold text-green-100">Total Earnings</h3>
                     </div>
-                    <p className="text-5xl font-black text-white relative z-10 tracking-tight">{formatCurrency(totalEarnings)} <span className="text-xl text-green-400/60 font-medium">ETH</span></p>
+                    <p className="text-5xl font-black text-white relative z-10 tracking-tight">{formatCurrency(totalEarnings)} <span className="text-xl text-green-400/60 font-medium">USDC</span></p>
                 </motion.div>
 
                 {/* Subscribers */}
@@ -205,13 +206,13 @@ export default function DashboardPage() {
 
                         <div className="mb-8 p-6 rounded-2xl bg-black/20 border border-white/5">
                             <label className="block text-slate-500 text-xs font-bold uppercase tracking-wider mb-2">Current Price</label>
-                            <div className="text-3xl font-bold text-white mb-1">{formatCurrency(subscriptionPrice)} ETH</div>
-                            <p className="text-sm text-slate-500">Approx. ${(parseFloat(formatEther(subscriptionPrice)) * 2500).toFixed(2)} USD</p>
+                            <div className="text-3xl font-bold text-white mb-1">{formatCurrency(subscriptionPrice)} USDC</div>
+                            <p className="text-sm text-slate-500">Approx. ${(parseFloat(formatUnits(subscriptionPrice, 6)) * 1).toFixed(2)} USD</p>
                         </div>
 
                         <form onSubmit={handleUpdatePrice}>
                             <div className="mb-6">
-                                <label className="block text-slate-400 text-sm font-bold mb-3">Update Monthly Price (ETH)</label>
+                                <label className="block text-slate-400 text-sm font-bold mb-3">Update Monthly Price (USDC)</label>
                                 <input
                                     type="number"
                                     step="0.0001"
@@ -315,6 +316,6 @@ export default function DashboardPage() {
                     </div>
                 </div>
             </div>
-        </div>
+        </div >
     );
 }

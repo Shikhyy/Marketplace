@@ -5,7 +5,7 @@ import { toast } from 'sonner';
 import { usePrivy, useWallets } from '@privy-io/react-auth';
 import { Loader2, Lock, Play, Pause, Volume2, Maximize, User, ShieldCheck, CheckCircle, AlertCircle, Share2, Wallet } from 'lucide-react';
 import Link from 'next/link';
-import { createPublicClient, http, formatEther } from 'viem';
+import { createPublicClient, http, formatUnits } from 'viem';
 import { baseSepolia } from 'viem/chains';
 import { CREATOR_HUB_ADDRESS, CREATOR_HUB_ABI, NEXT_PUBLIC_IPFS_GATEWAY, USDC_SEPOLIA_ADDRESS, CHAIN_ID, MOCK_PRICE_USDC } from '@/config/constants';
 import { useX402 } from '@/hooks/useX402';
@@ -366,10 +366,7 @@ export default function ContentPage(props: { params: Promise<{ id: string }> }) 
                 }
             }
 
-<<<<<<< HEAD:walrus-x402/frontend/src/app/content/[id]/page.tsx
-=======
-            // 2. Call x402 API
->>>>>>> origin/main:walrus-x402/src/app/content/[id]/page.tsx
+
             // Even if no proof, call it to see if it's Free (402 check)
             const headers: any = {};
             if (paymentProof) headers['X-PAYMENT'] = paymentProof;
@@ -437,11 +434,7 @@ export default function ContentPage(props: { params: Promise<{ id: string }> }) 
             // Payment Metadata
             const metadata = {
                 chainId: CHAIN_ID,
-<<<<<<< HEAD:walrus-x402/frontend/src/app/content/[id]/page.tsx
                 tokenAddress: content.paymentToken, // Use content's payment token
-=======
-                tokenAddress: '0x0000000000000000000000000000000000000000', // FORCE ETH: Contract rentContent() requires msg.value
->>>>>>> origin/main:walrus-x402/src/app/content/[id]/page.tsx
                 amount: amount,
                 recipient: content.creatorAddress, // DIRECT TO CREATOR
                 paymentParameter: {
@@ -601,9 +594,9 @@ export default function ContentPage(props: { params: Promise<{ id: string }> }) 
                                                         <div className="flex flex-col items-center py-1 space-y-0.5">
                                                             <div className="flex items-end gap-1">
                                                                 <span className="text-3xl font-black text-white tracking-tighter drop-shadow-lg">
-                                                                    {parseFloat(formatEther(BigInt(activePrice))).toLocaleString(undefined, { maximumFractionDigits: 6 })}
+                                                                    {parseFloat(formatUnits(BigInt(activePrice), 6)).toLocaleString(undefined, { maximumFractionDigits: 6 })}
                                                                 </span>
-                                                                <span className="text-xs font-bold text-slate-500 mb-1">ETH</span>
+                                                                <span className="text-xs font-bold text-slate-500 mb-1">USDC</span>
                                                             </div>
                                                             <span className={`text-[9px] font-bold uppercase tracking-widest py-0.5 px-2 rounded-full border ${purchaseType === 'rent' ? 'bg-indigo-500/10 border-indigo-500/20 text-indigo-300' : 'bg-emerald-500/10 border-emerald-500/20 text-emerald-300'}`}>
                                                                 {purchaseType === 'rent' ? '24 Hour Access' : 'Lifetime Access (Direct)'}
@@ -800,7 +793,7 @@ export default function ContentPage(props: { params: Promise<{ id: string }> }) 
                                                     <span>{new Date(item.timestamp * 1000).toLocaleDateString()}</span>
                                                     {item.isPremium && (
                                                         <span className="text-indigo-400 font-bold">
-                                                            {item.price ? parseFloat(formatEther(BigInt(item.price))).toLocaleString(undefined, { maximumFractionDigits: 6 }) : ''} ETH
+                                                            {item.price ? parseFloat(formatUnits(BigInt(item.price), 6)).toLocaleString(undefined, { maximumFractionDigits: 6 }) : ''} USDC
                                                         </span>
                                                     )}
                                                 </div>

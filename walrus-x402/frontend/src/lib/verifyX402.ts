@@ -7,11 +7,8 @@ const client = createPublicClient({
     transport: http()
 });
 
-<<<<<<< HEAD:walrus-x402/frontend/src/lib/verifyX402.ts
 import { USDC_SEPOLIA_ADDRESS } from '@/config/constants';
 
-=======
->>>>>>> origin/main:walrus-x402/src/lib/verifyX402.ts
 /**
  * Verifies a P2P x402 payment by checking the transaction on-chain.
  * @param txHash The transaction hash provided in X-PAYMENT header
@@ -23,11 +20,7 @@ export async function verifyP2PPayment(
     txHash: string,
     expectedRecipient: string,
     expectedAmount: string,
-<<<<<<< HEAD:walrus-x402/frontend/src/lib/verifyX402.ts
     expectedToken: string = USDC_SEPOLIA_ADDRESS
-=======
-    expectedToken: string = '0x0000000000000000000000000000000000000000'
->>>>>>> origin/main:walrus-x402/src/lib/verifyX402.ts
 ): Promise<boolean> {
     if (!txHash || !txHash.startsWith('0x')) {
         console.error("Invalid payment hash format");

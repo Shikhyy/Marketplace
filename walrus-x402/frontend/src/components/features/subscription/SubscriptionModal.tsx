@@ -111,7 +111,7 @@ export default function SubscriptionModal({ isOpen, onClose, plan, onSuccess }: 
 
                 <div className="p-4 bg-slate-950 rounded-xl border border-slate-800">
                     <div className="text-sm text-slate-400">Price</div>
-                    <div className="text-3xl font-bold text-white">{plan.price} ETH</div>
+                    <div className="text-3xl font-bold text-white">{plan.price} USDC</div>
                     <div className="text-xs text-slate-500">per {plan.period}</div>
                 </div>
 

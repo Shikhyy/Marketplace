@@ -7,14 +7,10 @@ import Link from 'next/link';
 import { usePrivy, useWallets } from '@privy-io/react-auth';
 import { useSubscription } from '@/hooks/useSubscription';
 import { useX402 } from '@/hooks/useX402';
-import { createPublicClient, createWalletClient, custom, formatEther, http } from 'viem';
+import { createPublicClient, createWalletClient, custom, formatUnits, http } from 'viem';
 import { baseSepolia } from 'viem/chains';
-<<<<<<< HEAD:walrus-x402/frontend/src/app/creators/[address]/page.tsx
 import { CREATOR_HUB_ADDRESS, CREATOR_HUB_ABI, NEXT_PUBLIC_IPFS_GATEWAY, USDC_SEPOLIA_ADDRESS, MOCK_PRICE_USDC, CHAIN_ID } from '@/config/constants';
 import { redirect } from 'next/navigation';
-=======
-import { CREATOR_HUB_ADDRESS, CREATOR_HUB_ABI, NEXT_PUBLIC_IPFS_GATEWAY, USDC_SEPOLIA_ADDRESS, MOCK_PRICE_USDC } from '@/config/constants';
->>>>>>> origin/main:walrus-x402/src/app/creators/[address]/page.tsx
 import { motion } from 'framer-motion';
 
 const GATEWAY = NEXT_PUBLIC_IPFS_GATEWAY || "https://gateway.lighthouse.storage/ipfs/";
@@ -161,7 +157,6 @@ export default function CreatorProfile(props: { params: Promise<{ address: strin
         }
 
         try {
-<<<<<<< HEAD:walrus-x402/frontend/src/app/creators/[address]/page.tsx
             // const amountToPay = subscriptionPrice; // Use actual price from contract
 
             const txHash = await handlePayment({
@@ -171,16 +166,6 @@ export default function CreatorProfile(props: { params: Promise<{ address: strin
                 recipient: params.address,
                 paymentParameter: {
                     type: 'subscription' as const,
-=======
-            const amountToPay = subscriptionPrice; // Use actual price from contract
-
-            const txHash = await handlePayment({
-                chainId: baseSepolia.id,
-                tokenAddress: '0x0000000000000000000000000000000000000000', // FORCE ETH
-                amount: amountToPay.toString(),
-                recipient: params.address,
-                paymentParameter: {
->>>>>>> origin/main:walrus-x402/src/app/creators/[address]/page.tsx
                     minerOf: params.address
                 }
             });
@@ -312,88 +297,81 @@ export default function CreatorProfile(props: { params: Promise<{ address: strin
                                                 </>
                                             ) : (
                                                 <>
-                                                    <span className="relative z-10">{paymentState === 'error' ? 'Retry' : 'Subscribe'}</span>
-                                                    <span className="relative z-10 px-2 py-0.5 bg-black/5 rounded-md text-xs font-medium opacity-60">
-                                                        {formatEther(subscriptionPrice)} ETH
-                                                    </span>
-                                                </>
+                                                    {formatUnits(subscriptionPrice, 6)} USDC
                                             )}
-                                        </button>
+                                                </button>
+                                    )}
+                                        </div>
                                     )}
                                 </div>
+                    </div>
+                    </div>
+                </div> <div className="max-w-7xl mx-auto px-4 md:px-8 mt-12">
+                    <div className="flex items-center justify-between mb-8">
+                        <h2 className="text-2xl font-bold text-white flex items-center gap-2">
+                            <Play className="w-5 h-5 text-cyan-500" />
+                            Latest Content
+                        </h2>
+                    </div>
+
+                    {creatorContent.length === 0 ? (
+                        <div className="py-20 text-center border border-dashed border-slate-800 rounded-3xl bg-slate-900/30">
+                            <p className="text-slate-500">No content published yet.</p>
+                            {isOwner && (
+                                <Link href="/upload" className="text-cyan-500 hover:underline mt-2 inline-block">
+                                    Upload your first video
+                                </Link>
                             )}
                         </div>
-                    </div>
-                </div>
-            </div> <div className="max-w-7xl mx-auto px-4 md:px-8 mt-12">
-                <div className="flex items-center justify-between mb-8">
-                    <h2 className="text-2xl font-bold text-white flex items-center gap-2">
-                        <Play className="w-5 h-5 text-cyan-500" />
-                        Latest Content
-                    </h2>
-                </div>
+                    ) : (
+                        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+                            {creatorContent.map((item, i) => {
+                                const locked = item.premium && !isSubscribed && !isOwner;
 
-                {creatorContent.length === 0 ? (
-                    <div className="py-20 text-center border border-dashed border-slate-800 rounded-3xl bg-slate-900/30">
-                        <p className="text-slate-500">No content published yet.</p>
-                        {isOwner && (
-                            <Link href="/upload" className="text-cyan-500 hover:underline mt-2 inline-block">
-                                Upload your first video
-                            </Link>
-                        )}
-                    </div>
-                ) : (
-                    <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-                        {creatorContent.map((item, i) => {
-                            const locked = item.premium && !isSubscribed && !isOwner;
+                                return (
+                                    <motion.div
+                                        key={item.id}
+                                        initial={{ opacity: 0, y: 20 }}
+                                        animate={{ opacity: 1, y: 0 }}
+                                        transition={{ delay: i * 0.05 }}
+                                        className="group relative bg-slate-900 border border-slate-800 rounded-2xl overflow-hidden hover:border-cyan-500/30 transition-all hover:shadow-2xl hover:shadow-cyan-900/20"
+                                    >
+                                        <div className="aspect-video relative overflow-hidden bg-slate-800">
+                                            <img
+                                                src={item.thumbnail}
+                                                alt={item.title}
+                                                className={`w-full h-full object-cover transition-transform duration-500 group-hover:scale-105 ${locked ? 'blur-md opacity-50' : ''}`}
+                                                onError={(e) => { (e.target as HTMLImageElement).src = 'https://images.unsplash.com/photo-1626544827763-d516dce335ca?q=80&w=1000'; }}
+                                            />
 
-                            return (
-                                <motion.div
-                                    key={item.id}
-                                    initial={{ opacity: 0, y: 20 }}
-                                    animate={{ opacity: 1, y: 0 }}
-                                    transition={{ delay: i * 0.05 }}
-                                    className="group relative bg-slate-900 border border-slate-800 rounded-2xl overflow-hidden hover:border-cyan-500/30 transition-all hover:shadow-2xl hover:shadow-cyan-900/20"
-                                >
-                                    <div className="aspect-video relative overflow-hidden bg-slate-800">
-                                        <img
-                                            src={item.thumbnail}
-                                            alt={item.title}
-                                            className={`w-full h-full object-cover transition-transform duration-500 group-hover:scale-105 ${locked ? 'blur-md opacity-50' : ''}`}
-                                            onError={(e) => { (e.target as HTMLImageElement).src = 'https://images.unsplash.com/photo-1626544827763-d516dce335ca?q=80&w=1000'; }}
-                                        />
+                                            <div className="absolute top-3 right-3 flex gap-2">
+                                                {item.premium && (
+                                                    <span className="px-2 py-1 bg-amber-500 text-black text-xs font-bold uppercase tracking-wider rounded">
+                                                        Premium
+                                                    </span>
+                                                )}
+                                            </div>
 
-                                        <div className="absolute top-3 right-3 flex gap-2">
-                                            {item.premium && (
-                                                <span className="px-2 py-1 bg-amber-500 text-black text-xs font-bold uppercase tracking-wider rounded">
-                                                    Premium
-                                                </span>
+                                            <div className="absolute bottom-3 right-3 px-2 py-1 bg-black/60 backdrop-blur rounded text-xs text-white font-mono">
+                                                {item.type.toUpperCase()}
+                                            </div>
+
+                                            {locked && (
+                                                <div className="absolute inset-0 flex flex-col items-center justify-center z-10">
+                                                    <Lock className="w-10 h-10 text-slate-300 mb-2" />
+                                                    <span className="text-slate-300 font-bold text-sm">Subscriber Only</span>
+                                                </div>
                                             )}
                                         </div>
 
-                                        <div className="absolute bottom-3 right-3 px-2 py-1 bg-black/60 backdrop-blur rounded text-xs text-white font-mono">
-                                            {item.type.toUpperCase()}
-                                        </div>
-
-                                        {locked && (
-                                            <div className="absolute inset-0 flex flex-col items-center justify-center z-10">
-                                                <Lock className="w-10 h-10 text-slate-300 mb-2" />
-                                                <span className="text-slate-300 font-bold text-sm">Subscriber Only</span>
-                                            </div>
-                                        )}
-                                    </div>
-
-                                    <div className="p-5">
-                                        <h3 className="font-bold text-lg text-white mb-2 line-clamp-1 group-hover:text-cyan-400 transition-colors">
-                                            {item.title}
-                                        </h3>
-                                        <div className="flex items-center justify-between text-sm text-slate-500">
-                                            <span>{item.date}</span>
-                                            {item.premium && (
-                                                <span className="flex items-center gap-1 text-indigo-400">
-                                                    <Lock className="w-3 h-3" />
-                                                    {item.price ? parseFloat(formatEther(BigInt(item.price))).toLocaleString(undefined, { maximumFractionDigits: 6 }) : ''} ETH
-                                                </span>
+                                        <div className="p-5">
+                                            <h3 className="font-bold text-lg text-white mb-2 line-clamp-1 group-hover:text-cyan-400 transition-colors">
+                                                {item.title}
+                                            </h3>
+                                            <div className="flex items-center justify-between text-sm text-slate-500">
+                                                <span>{item.date}</span>
+                                                {item.price ? parseFloat(formatUnits(BigInt(item.price), 6)).toLocaleString(undefined, { maximumFractionDigits: 6 }) : ''} USDC
+                                            </span>
                                             )}
                                         </div>
 
@@ -416,9 +394,9 @@ export default function CreatorProfile(props: { params: Promise<{ address: strin
                                         </div>
                                     </div>
                                 </motion.div>
-                            );
+                    );
                         })}
-                    </div>
+                </div>
                 )}
             </div>
         </div >

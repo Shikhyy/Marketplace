@@ -139,7 +139,7 @@ export default function Home() {
                 <span className="font-bold text-red-500">~55% Share</span>
               </div>
               <div className="flex items-center justify-between p-4 rounded-xl bg-cyan-500/10 border border-cyan-500/20 shadow-[0_0_30px_-10px_rgba(34,211,238,0.3)]">
-                <span className="font-semibold text-cyan-200">Walrus x402</span>
+                <span className="font-semibold text-cyan-200">ContentHub x402</span>
                 <span className="font-bold text-cyan-400">100% Share</span>
               </div>
             </div>

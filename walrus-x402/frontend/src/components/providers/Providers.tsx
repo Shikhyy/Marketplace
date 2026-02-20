@@ -43,10 +43,15 @@ export default function Providers({ children }: { children: React.ReactNode }) {
         >
             <QueryClientProvider client={queryClient}>
                 <WagmiProvider config={wagmiConfig}>
+<<<<<<< HEAD:walrus-x402/frontend/src/components/providers/Providers.tsx
                     <React.Fragment key="app-content">
                         {children}
                         <Toaster position="top-center" richColors theme="dark" />
                     </React.Fragment>
+=======
+                    {children}
+                    <Toaster position="top-center" richColors theme="dark" />
+>>>>>>> origin/main:walrus-x402/src/components/providers/Providers.tsx
                 </WagmiProvider>
             </QueryClientProvider>
         </PrivyProvider>

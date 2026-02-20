@@ -9,8 +9,12 @@ import { useSubscription } from '@/hooks/useSubscription';
 import { useX402 } from '@/hooks/useX402';
 import { createPublicClient, createWalletClient, custom, formatEther, http } from 'viem';
 import { baseSepolia } from 'viem/chains';
+<<<<<<< HEAD:walrus-x402/frontend/src/app/creators/[address]/page.tsx
 import { CREATOR_HUB_ADDRESS, CREATOR_HUB_ABI, NEXT_PUBLIC_IPFS_GATEWAY, USDC_SEPOLIA_ADDRESS, MOCK_PRICE_USDC, CHAIN_ID } from '@/config/constants';
 import { redirect } from 'next/navigation';
+=======
+import { CREATOR_HUB_ADDRESS, CREATOR_HUB_ABI, NEXT_PUBLIC_IPFS_GATEWAY, USDC_SEPOLIA_ADDRESS, MOCK_PRICE_USDC } from '@/config/constants';
+>>>>>>> origin/main:walrus-x402/src/app/creators/[address]/page.tsx
 import { motion } from 'framer-motion';
 
 const GATEWAY = NEXT_PUBLIC_IPFS_GATEWAY || "https://gateway.lighthouse.storage/ipfs/";
@@ -157,6 +161,7 @@ export default function CreatorProfile(props: { params: Promise<{ address: strin
         }
 
         try {
+<<<<<<< HEAD:walrus-x402/frontend/src/app/creators/[address]/page.tsx
             // const amountToPay = subscriptionPrice; // Use actual price from contract
 
             const txHash = await handlePayment({
@@ -166,6 +171,16 @@ export default function CreatorProfile(props: { params: Promise<{ address: strin
                 recipient: params.address,
                 paymentParameter: {
                     type: 'subscription' as const,
+=======
+            const amountToPay = subscriptionPrice; // Use actual price from contract
+
+            const txHash = await handlePayment({
+                chainId: baseSepolia.id,
+                tokenAddress: '0x0000000000000000000000000000000000000000', // FORCE ETH
+                amount: amountToPay.toString(),
+                recipient: params.address,
+                paymentParameter: {
+>>>>>>> origin/main:walrus-x402/src/app/creators/[address]/page.tsx
                     minerOf: params.address
                 }
             });

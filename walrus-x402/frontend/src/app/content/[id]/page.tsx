@@ -366,6 +366,10 @@ export default function ContentPage(props: { params: Promise<{ id: string }> }) 
                 }
             }
 
+<<<<<<< HEAD:walrus-x402/frontend/src/app/content/[id]/page.tsx
+=======
+            // 2. Call x402 API
+>>>>>>> origin/main:walrus-x402/src/app/content/[id]/page.tsx
             // Even if no proof, call it to see if it's Free (402 check)
             const headers: any = {};
             if (paymentProof) headers['X-PAYMENT'] = paymentProof;
@@ -433,7 +437,11 @@ export default function ContentPage(props: { params: Promise<{ id: string }> }) 
             // Payment Metadata
             const metadata = {
                 chainId: CHAIN_ID,
+<<<<<<< HEAD:walrus-x402/frontend/src/app/content/[id]/page.tsx
                 tokenAddress: content.paymentToken, // Use content's payment token
+=======
+                tokenAddress: '0x0000000000000000000000000000000000000000', // FORCE ETH: Contract rentContent() requires msg.value
+>>>>>>> origin/main:walrus-x402/src/app/content/[id]/page.tsx
                 amount: amount,
                 recipient: content.creatorAddress, // DIRECT TO CREATOR
                 paymentParameter: {

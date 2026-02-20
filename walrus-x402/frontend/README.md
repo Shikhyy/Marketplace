@@ -79,6 +79,34 @@ Deployed on **Base Sepolia**.
 - `subscribe(address creator)`: Monthly subscription to a creator.
 - `checkRental(address user, uint256 contentId)`: Verifies access status.
 
+## 🚀 Vercel Deployment
+
+Deploying this application to Vercel is highly optimized because of the pre-configured root `vercel.json` and `package.json`.
+
+1. **Import the repository** into your Vercel dashboard.
+2. **Leave the Framework and Root Directory exactly as they are**. Vercel will automatically execute the root build script that builds the Next.js app inside `frontend`.
+3. **Add the following Environment Variables**:
+
+```env
+# Privy Settings (Required for wallet login)
+NEXT_PUBLIC_PRIVY_APP_ID=your_privy_app_id
+PRIVY_APP_SECRET=your_privy_app_secret
+
+# PostgreSQL Database
+DATABASE_URL=your_postgres_database_url
+
+# Security
+CONTENT_SIGNING_SECRET=your_jwt_signing_secret
+
+# IPFS Storage
+NEXT_PUBLIC_LIGHTHOUSE_API_KEY=your_lighthouse_api_key
+
+# Blockchain Provider (Optional)
+NEXT_PUBLIC_RPC_URL=your_base_sepolia_rpc_url
+```
+
+4. Click **Deploy**.
+
 ## 🤝 Contributing
 
 Contributions are welcome! Please feel free to submit a Pull Request.

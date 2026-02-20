@@ -1,6 +1,12 @@
 {
     "name": "content-hub-x402",
     "private": true,
+    "scripts": {
+        "build": "npm run build --workspace=frontend",
+        "dev": "npm run dev --workspace=frontend",
+        "start": "npm run start --workspace=frontend",
+        "lint": "npm run lint --workspace=frontend"
+    },
     "workspaces": [
         "frontend"
     ]

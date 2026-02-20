@@ -119,45 +119,32 @@ export default function UploadPage() {
     // ...
 
     const uploadToServer = async (file: File, paymentProof: string, uploadId: string, label: string) => {
-        const arrayBuffer = await file.arrayBuffer();
+        return new Promise<string>(async (resolve, reject) => {
+            try {
+                setProgress(`Uploading ${label} to IPFS...`);
 
-        return new Promise<string>((resolve, reject) => {
-            const xhr = new XMLHttpRequest();
-            xhr.open('POST', '/api/upload/complete');
-
-            xhr.setRequestHeader('x-payment', paymentProof);
-            xhr.setRequestHeader('x-upload-id', uploadId);
-            xhr.setRequestHeader('x-file-name', encodeURIComponent(file.name));
-            xhr.setRequestHeader('Content-Type', 'application/octet-stream');
-
-            xhr.upload.onprogress = (event) => {
-                if (event.lengthComputable) {
-                    const percentComplete = Math.round((event.loaded / event.total) * 100);
-                    setProgress(`Uploading ${label}: ${percentComplete}%`);
-                }
-            };
-
-            xhr.onload = () => {
-                if (xhr.status >= 200 && xhr.status < 300) {
-                    try {
-                        const data = JSON.parse(xhr.responseText);
-                        setProgress(`Saving ${label} to IPFS...`);
-                        resolve(data.cid);
-                    } catch (e) {
-                        reject(new Error('Invalid response from server'));
+                const progressCallback = (progressData: any) => {
+                    if (progressData?.total) {
+                        const percent = Math.round((progressData.uploaded / progressData.total) * 100);
+                        setProgress(`Uploading ${label}: ${percent}%`);
                     }
-                } else {
-                    try {
-                        const err = JSON.parse(xhr.responseText);
-                        reject(new Error(err.error || 'Upload failed'));
-                    } catch (e) {
-                        reject(new Error('Upload failed'));
-                    }
-                }
-            };
+                };
 
-            xhr.onerror = () => reject(new Error('Network error during upload'));
-            xhr.send(arrayBuffer);
+                const output = await lighthouse.upload(
+                    [file],
+                    LIGHTHOUSE_API_KEY,
+                    false,
+                    null,
+                    progressCallback
+                );
+
+                console.log(`[Upload] ${label} successfully uploaded to IPFS:`, output.data.Hash);
+                setProgress(`Saving ${label}...`);
+                resolve(output.data.Hash);
+            } catch (error: any) {
+                console.error(`Upload error for ${label}:`, error);
+                reject(new Error(error.message || 'Lighthouse direct upload failed'));
+            }
         });
     };
 

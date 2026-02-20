@@ -298,8 +298,9 @@ export default function CreatorProfile(props: { params: Promise<{ address: strin
                                             ) : (
                                                 <>
                                                     {formatUnits(subscriptionPrice, 6)} USDC
+                                                </>
                                             )}
-                                                </button>
+                                        </button>
                                     )}
                                         </div>
                                     )}
@@ -370,9 +371,10 @@ export default function CreatorProfile(props: { params: Promise<{ address: strin
                                             </h3>
                                             <div className="flex items-center justify-between text-sm text-slate-500">
                                                 <span>{item.date}</span>
-                                                {item.price ? parseFloat(formatUnits(BigInt(item.price), 6)).toLocaleString(undefined, { maximumFractionDigits: 6 }) : ''} USDC
-                                            </span>
-                                            )}
+                                                <span>
+                                                    {item.price ? parseFloat(formatUnits(BigInt(item.price), 6)).toLocaleString(undefined, { maximumFractionDigits: 6 }) : '0'} USDC
+                                                </span>
+                                            </div>
                                         </div>
 
                                         <div className="mt-4">
@@ -392,7 +394,6 @@ export default function CreatorProfile(props: { params: Promise<{ address: strin
                                                 </Link>
                                             )}
                                         </div>
-                                    </div>
                                 </motion.div>
                     );
                         })}

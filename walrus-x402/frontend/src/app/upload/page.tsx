@@ -29,6 +29,7 @@ export default function UploadPage() {
 
     const [uploading, setUploading] = useState(false);
     const [progress, setProgress] = useState('');
+    const [uploadProgress, setUploadProgress] = useState<{ video: number; cover: number }>({ video: 0, cover: 0 });
 
     // Registration State
     const [channelName, setChannelName] = useState('');
@@ -118,32 +119,26 @@ export default function UploadPage() {
     const { handlePayment, paymentState } = useX402();
     // ...
 
-    const uploadToServer = async (file: File, paymentProof: string, uploadId: string, label: string) => {
-        return new Promise<string>(async (resolve, reject) => {
-            try {
-                setProgress(`Uploading ${label} to IPFS...`);
-
-                const progressCallback = (progressData: any) => {
-                    if (progressData?.total) {
-                        const percent = Math.round((progressData.uploaded / progressData.total) * 100);
-                        setProgress(`Uploading ${label}: ${percent}%`);
-                    }
-                };
-
-                const output = await lighthouse.upload(
-                    [file],
-                    LIGHTHOUSE_API_KEY,
-                    { cidVersion: 1, onProgress: progressCallback }
-                );
-
-                console.log(`[Upload] ${label} successfully uploaded to IPFS:`, output.data.Hash);
-                setProgress(`Saving ${label}...`);
-                resolve(output.data.Hash);
-            } catch (error: any) {
-                console.error(`Upload error for ${label}:`, error);
-                reject(new Error(error.message || 'Lighthouse direct upload failed'));
+    const uploadToIPFS = async (
+        file: File,
+        label: 'video' | 'cover' | 'metadata',
+        onPercent?: (pct: number) => void
+    ): Promise<string> => {
+        const progressCallback = (progressData: any) => {
+            if (progressData?.total && onPercent) {
+                const pct = Math.round((progressData.uploaded / progressData.total) * 100);
+                onPercent(pct);
             }
-        });
+        };
+
+        const output = await lighthouse.upload(
+            [file],
+            LIGHTHOUSE_API_KEY,
+            { cidVersion: 1, onProgress: progressCallback }
+        );
+
+        console.log(`[Upload] ${label} → IPFS CID:`, output.data.Hash);
+        return output.data.Hash;
     };
 
     const handleUpload = async () => {
@@ -176,13 +171,19 @@ export default function UploadPage() {
 
             if (!txHash) throw new Error("Payment failed");
 
-            setProgress('Uploading assets...');
+            setProgress('Uploading assets to IPFS...');
+            setUploadProgress({ video: 0, cover: 0 });
 
-            setProgress('Uploading video: 0%');
-            const videoCID = await uploadToServer(file, txHash, uploadId, 'video');
-
-            setProgress('Uploading cover: 0%');
-            const thumbnailCID = await uploadToServer(thumbnail, txHash, uploadId, 'cover');
+            // Upload video + thumbnail IN PARALLEL
+            const [videoCID, thumbnailCID] = await Promise.all([
+                uploadToIPFS(file, 'video', (pct) =>
+                    setUploadProgress((prev) => ({ ...prev, video: pct }))
+                ),
+                uploadToIPFS(thumbnail, 'cover', (pct) =>
+                    setUploadProgress((prev) => ({ ...prev, cover: pct }))
+                )
+            ]);
+            setUploadProgress({ video: 100, cover: 100 });
 
             const address = walletClient.account.address;
 
@@ -213,7 +214,7 @@ export default function UploadPage() {
 
                 const metadataBlob = new Blob([JSON.stringify(metadata)], { type: 'application/json' });
                 const metadataFile = new File([metadataBlob], 'metadata.json');
-                const metadataCID = await uploadToServer(metadataFile, txHash, uploadId, 'metadata');
+                const metadataCID = await uploadToIPFS(metadataFile, 'metadata');
 
                 setProgress('Confirming transaction...');
 
@@ -458,6 +459,36 @@ export default function UploadPage() {
                             <p className="col-span-2 text-xs text-center text-slate-500">
                                 Content is encrypted and token-gated automatically.
                             </p>
+                        </div>
+                    )}
+
+                    {/* Progress Bars (visible while uploading assets) */}
+                    {uploading && progress.includes('IPFS') && (
+                        <div className="space-y-3 p-4 rounded-xl bg-slate-950/60 border border-white/5">
+                            <div className="space-y-1.5">
+                                <div className="flex justify-between text-xs text-slate-400">
+                                    <span>Video</span>
+                                    <span className="font-mono text-cyan-400">{uploadProgress.video}%</span>
+                                </div>
+                                <div className="h-1.5 rounded-full bg-slate-800 overflow-hidden">
+                                    <div
+                                        className="h-full bg-gradient-to-r from-cyan-500 to-blue-500 transition-all duration-300 ease-out"
+                                        style={{ width: `${uploadProgress.video}%` }}
+                                    />
+                                </div>
+                            </div>
+                            <div className="space-y-1.5">
+                                <div className="flex justify-between text-xs text-slate-400">
+                                    <span>Cover</span>
+                                    <span className="font-mono text-purple-400">{uploadProgress.cover}%</span>
+                                </div>
+                                <div className="h-1.5 rounded-full bg-slate-800 overflow-hidden">
+                                    <div
+                                        className="h-full bg-gradient-to-r from-purple-500 to-pink-500 transition-all duration-300 ease-out"
+                                        style={{ width: `${uploadProgress.cover}%` }}
+                                    />
+                                </div>
+                            </div>
                         </div>
                     )}
 

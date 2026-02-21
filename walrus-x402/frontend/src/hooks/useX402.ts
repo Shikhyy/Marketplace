@@ -119,17 +119,17 @@ export function useX402() {
                 setPaymentState('signing');
                 console.log("[useX402] Approval confirmed.");
 
-                // 2. Rent Content
-                console.log("[useX402] Simulating Rent Content...");
-                const { request } = await publicClient.simulateContract({
+                // 2. Rent Content — call writeContract directly (no simulateContract,
+                // because simulate runs against current block state and won't see the
+                // just-confirmed approval, causing a spurious allowance revert)
+                console.log("[useX402] Calling Rent Content...");
+                txHash = await walletClient.writeContract({
                     address: CREATOR_HUB_ADDRESS as `0x${string}`,
                     abi: CREATOR_HUB_ABI,
                     functionName: 'rentContent',
                     args: [contentId],
                     account: wallet.address as `0x${string}`
                 });
-
-                txHash = await walletClient.writeContract(request);
 
             } else {
                 // SUBSCRIPTION
@@ -150,17 +150,15 @@ export function useX402() {
                 setPaymentState('signing');
                 console.log("[useX402] Approval confirmed.");
 
-                // 2. Subscribe
-                console.log("[useX402] Simulating Subscribe...");
-                const { request } = await publicClient.simulateContract({
+                // 2. Subscribe — same pattern, skip simulate
+                console.log("[useX402] Calling Subscribe...");
+                txHash = await walletClient.writeContract({
                     address: CREATOR_HUB_ADDRESS as `0x${string}`,
                     abi: CREATOR_HUB_ABI,
                     functionName: 'subscribe',
                     args: [metadata.recipient as `0x${string}`],
                     account: wallet.address as `0x${string}`
                 });
-
-                txHash = await walletClient.writeContract(request);
             }
 
             console.log("[useX402] Transaction Sent:", txHash);

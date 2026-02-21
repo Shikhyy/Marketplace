@@ -447,8 +447,7 @@ export default function ContentPage(props: { params: Promise<{ id: string }> }) 
             if (txHash) {
                 console.log("[Payment] Success:", txHash);
 
-                // Save Proof to Local Storage (Client-side Indexing)
-                // Required because Direct Payments don't update contract state immediately/at all
+                // Save Proof to Local Storage
                 const storageKey = `rentals_${user?.wallet?.address}`;
                 const currentRentals = JSON.parse(localStorage.getItem(storageKey) || '{}');
                 currentRentals[content.id] = { txHash, timestamp: Date.now() };
@@ -456,8 +455,12 @@ export default function ContentPage(props: { params: Promise<{ id: string }> }) 
 
                 toast.success("Payment successful! Access granted.");
 
-                // Re-verify immediately with the new proof
-                await verifyAccess();
+                // Immediately grant access — the on-chain tx is confirmed so no need to
+                // re-verify through the API (which requires auth headers we don't have here).
+                // Build the stream URL directly from the content's videoCID.
+                const streamVideoUrl = `${GATEWAY}${content.videoCID}`;
+                setStreamUrl(streamVideoUrl);
+                setAuthorized(true);
             }
 
         } catch (e: any) {

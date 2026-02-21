@@ -133,9 +133,7 @@ export default function UploadPage() {
                 const output = await lighthouse.upload(
                     [file],
                     LIGHTHOUSE_API_KEY,
-                    false,
-                    null,
-                    progressCallback
+                    { cidVersion: 1, onProgress: progressCallback }
                 );
 
                 console.log(`[Upload] ${label} successfully uploaded to IPFS:`, output.data.Hash);

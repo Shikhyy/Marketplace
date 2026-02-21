@@ -40,7 +40,7 @@ const container = {
 
 const itemAnim = {
     hidden: { opacity: 0, y: 30 },
-    show: { opacity: 1, y: 0, transition: { type: "spring", stiffness: 50, damping: 20 } }
+    show: { opacity: 1, y: 0, transition: { type: "spring" as const, stiffness: 50, damping: 20 } }
 };
 
 export default function ExplorePage() {
@@ -53,7 +53,7 @@ export default function ExplorePage() {
             try {
                 const client = createPublicClient({
                     chain: baseSepolia,
-                    transport: http()
+                    transport: http('https://sepolia.base.org')
                 });
 
                 // Parallel fetch: Latest Videos (Legacy) & Latest Content (Premium)
@@ -74,32 +74,35 @@ export default function ExplorePage() {
 
                 const formattedItems: VideoContent[] = [];
 
-                // 1. Process Legacy Videos
+                // 1. Process Legacy Videos (parallel channel lookups)
                 if (rawVideos && rawVideos.length > 0) {
-                    for (const v of rawVideos) {
-                        let channelName = "Unknown Creator";
-                        try {
-                            channelName = await client.readContract({
-                                address: CREATOR_HUB_ADDRESS as `0x${string}`,
-                                abi: CREATOR_HUB_ABI,
-                                functionName: 'getChannelName',
-                                args: [v.uploader]
-                            }) as string;
-                        } catch (e) { }
+                    const legacyItems = await Promise.all(
+                        rawVideos.map(async (v: any) => {
+                            let channelName = "Unknown Creator";
+                            try {
+                                channelName = await client.readContract({
+                                    address: CREATOR_HUB_ADDRESS as `0x${string}`,
+                                    abi: CREATOR_HUB_ABI,
+                                    functionName: 'getChannelName',
+                                    args: [v.uploader]
+                                }) as string;
+                            } catch (e) { }
 
-                        formattedItems.push({
-                            id: v.videoCID,
-                            title: v.title,
-                            creator: channelName || "Creator",
-                            creatorAddress: v.uploader,
-                            type: 'video',
-                            tier: 'free',
-                            thumbnail: `${GATEWAY}${v.thumbnailCID}`,
-                            duration: new Date(Number(v.timestamp) * 1000).toLocaleDateString(),
-                            videoCID: v.videoCID,
-                            isLegacy: true
-                        });
-                    }
+                            return {
+                                id: v.videoCID,
+                                title: v.title,
+                                creator: channelName || "Creator",
+                                creatorAddress: v.uploader,
+                                type: 'video' as const,
+                                tier: 'free' as const,
+                                thumbnail: `${GATEWAY}${v.thumbnailCID}`,
+                                duration: new Date(Number(v.timestamp) * 1000).toLocaleDateString(),
+                                videoCID: v.videoCID,
+                                isLegacy: true
+                            };
+                        })
+                    );
+                    formattedItems.push(...legacyItems);
                 }
 
                 // 2. Process Premium Content

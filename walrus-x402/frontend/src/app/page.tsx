@@ -31,7 +31,7 @@ export default function Home() {
       try {
         const client = createPublicClient({
           chain: baseSepolia,
-          transport: http()
+          transport: http('https://sepolia.base.org')
         });
 
         // @ts-ignore

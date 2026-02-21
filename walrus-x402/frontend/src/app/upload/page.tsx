@@ -189,20 +189,23 @@ export default function UploadPage() {
 
             if (activeTab === 'showcase') {
                 // Legacy Showcase Upload
-                setProgress('Confirming transaction...');
-                await walletClient.writeContract({
+                setProgress('Waiting for transaction confirmation...');
+                const showcaseTxHash = await walletClient.writeContract({
                     address: CREATOR_HUB_ADDRESS as `0x${string}`,
                     abi: CREATOR_HUB_ABI,
                     functionName: 'uploadVideo',
                     args: [title, videoCID, thumbnailCID],
                     account: address
                 });
+                // Wait for the tx to be mined — content only appears on-chain after this
+                if (publicClient) {
+                    setProgress('Mining transaction...');
+                    await publicClient.waitForTransactionReceipt({ hash: showcaseTxHash });
+                }
             } else {
                 // Premium Content Upload
                 setProgress('Uploading metadata...');
 
-                // For Metadata, we can also use the proxy or just create it locally?
-                // The proxy expects a 'file'. We can send a Blob.
                 const metadata = {
                     title,
                     description,
@@ -216,12 +219,12 @@ export default function UploadPage() {
                 const metadataFile = new File([metadataBlob], 'metadata.json');
                 const metadataCID = await uploadToIPFS(metadataFile, 'metadata');
 
-                setProgress('Confirming transaction...');
+                setProgress('Waiting for transaction confirmation...');
 
                 const fullPriceBigInt = price ? parseUnits(price, 6) : BigInt(0);
                 const rentPriceBigInt = rentPrice ? parseUnits(rentPrice, 6) : BigInt(0);
 
-                await walletClient.writeContract({
+                const premiumTxHash = await walletClient.writeContract({
                     address: CREATOR_HUB_ADDRESS as `0x${string}`,
                     abi: CREATOR_HUB_ABI,
                     functionName: 'createContent',
@@ -235,6 +238,11 @@ export default function UploadPage() {
                     ],
                     account: address
                 });
+                // Wait for the tx to be mined — content only appears on-chain after this
+                if (publicClient) {
+                    setProgress('Mining transaction...');
+                    await publicClient.waitForTransactionReceipt({ hash: premiumTxHash });
+                }
             }
 
             setProgress('Success! Processing...');

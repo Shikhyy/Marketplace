@@ -18,6 +18,7 @@ export default function DashboardPage() {
     const { address, isConnected } = useAccount();
     const [isClient, setIsClient] = useState(false);
     const [newPrice, setNewPrice] = useState('');
+    const [contentTitles, setContentTitles] = useState<Record<string, string>>({});
 
     // Initial client-side check
     useEffect(() => {
@@ -115,10 +116,30 @@ export default function DashboardPage() {
     const subscriberCount = (creatorData as any)[4];
     const totalEarnings = (creatorData as any)[5];
 
-    // Filter My Content
+    // Filter My Content — include INACTIVE so creator can delete duplicates
     const myContent = allContent
         ? (allContent as any[]).filter((c: any) => c.creatorAddress === address)
         : [];
+
+    // Fetch titles from IPFS metadata for each content item
+    useEffect(() => {
+        if (!myContent.length) return;
+        const GATEWAY = NEXT_PUBLIC_IPFS_GATEWAY;
+        myContent.forEach(async (item: any) => {
+            const key = item.id.toString();
+            if (contentTitles[key]) return; // already loaded
+            try {
+                const res = await fetch(GATEWAY + item.metadataURI.replace('ipfs://', ''));
+                if (res.ok) {
+                    const meta = await res.json();
+                    setContentTitles(prev => ({ ...prev, [key]: meta.title || `Content #${key}` }));
+                }
+            } catch {
+                setContentTitles(prev => ({ ...prev, [key]: `Content #${key}` }));
+            }
+        });
+        // eslint-disable-next-line react-hooks/exhaustive-deps
+    }, [allContent]);
 
     return (
         <div className="min-h-screen pt-24 pb-20 px-6 md:px-12 max-w-7xl mx-auto space-y-12">
@@ -255,35 +276,29 @@ export default function DashboardPage() {
                             <div className="space-y-3">
                                 {myContent.map((item: any) => {
                                     const isActive = item.active;
-                                    const isLegacy = item.cType === undefined;
-
-                                    if (!isActive && !isLegacy) return null;
+                                    const key = item.id.toString();
+                                    const title = contentTitles[key] || `Loading... (ID ${key})`;
 
                                     return (
-                                        <div key={item.id.toString()} className="flex items-center gap-5 p-4 rounded-2xl bg-white/5 border border-white/5 hover:bg-white/10 hover:border-white/10 transition-colors group">
+                                        <div key={key} className={`flex items-center gap-5 p-4 rounded-2xl border transition-colors group ${isActive ? 'bg-white/5 border-white/5 hover:bg-white/10 hover:border-white/10' : 'bg-red-500/5 border-red-500/10 opacity-60'}`}>
                                             <div className="w-16 h-12 rounded-lg bg-slate-800 flex-shrink-0 flex items-center justify-center border border-white/5">
                                                 <Video size={20} className="text-slate-500" />
                                             </div>
                                             <div className="flex-grow min-w-0">
                                                 <div className="flex items-center gap-2 mb-1">
-                                                    <h3 className="text-white font-bold truncate">{item.id.toString()}</h3>
+                                                    <h3 className={`font-bold truncate ${isActive ? 'text-white' : 'text-slate-500 line-through'}`}>{title}</h3>
                                                     <span className={`px-1.5 py-0.5 rounded text-[10px] font-bold uppercase ${item.isFree ? 'bg-emerald-500/20 text-emerald-400' : 'bg-indigo-500/20 text-indigo-400'}`}>
                                                         {item.isFree ? 'Free' : 'Premium'}
                                                     </span>
+                                                    {!isActive && <span className="px-1.5 py-0.5 rounded text-[10px] font-bold uppercase bg-red-500/20 text-red-400">Deleted</span>}
                                                 </div>
-                                                <p className="text-xs text-slate-500 font-mono">
-                                                    {isLegacy ? 'Legacy Protocol' : 'Verified Asset'}
-                                                </p>
+                                                <p className="text-xs text-slate-500 font-mono">ID: {key}</p>
                                             </div>
-                                            <div className="flex items-center gap-3 opacity-60 group-hover:opacity-100 transition-opacity">
-                                                <Link href={`/creators/${address}`} className="p-2 rounded-lg hover:bg-white/10 text-slate-300 hover:text-white transition-colors" title="View">
-                                                    <Video size={16} />
-                                                </Link>
-                                                {!isLegacy && (
+                                            <div className="flex items-center gap-2 opacity-60 group-hover:opacity-100 transition-opacity">
+                                                {isActive ? (
                                                     <button
-                                                        onClick={(e) => {
-                                                            e.preventDefault();
-                                                            if (confirm('Delete content?')) {
+                                                        onClick={() => {
+                                                            if (confirm(`Delete "${title}"? It will be hidden from the Explore page.`)) {
                                                                 writeContract({
                                                                     address: CREATOR_HUB_ADDRESS,
                                                                     abi: CREATOR_HUB_ABI,
@@ -295,6 +310,20 @@ export default function DashboardPage() {
                                                         className="px-3 py-1.5 rounded-lg bg-red-500/10 text-red-400 text-xs font-bold hover:bg-red-500/20 transition-colors"
                                                     >
                                                         Delete
+                                                    </button>
+                                                ) : (
+                                                    <button
+                                                        onClick={() => {
+                                                            writeContract({
+                                                                address: CREATOR_HUB_ADDRESS,
+                                                                abi: CREATOR_HUB_ABI,
+                                                                functionName: 'setContentActive',
+                                                                args: [item.id, true]
+                                                            });
+                                                        }}
+                                                        className="px-3 py-1.5 rounded-lg bg-emerald-500/10 text-emerald-400 text-xs font-bold hover:bg-emerald-500/20 transition-colors"
+                                                    >
+                                                        Restore
                                                     </button>
                                                 )}
                                             </div>

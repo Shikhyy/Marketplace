@@ -5,7 +5,7 @@ import { usePrivy } from '@privy-io/react-auth';
 import { useWalletClient, useReadContract, usePublicClient } from 'wagmi';
 import { Upload, X, Image as ImageIcon, Video, Loader2, Coins, UserPlus } from 'lucide-react';
 import { CREATOR_HUB_ADDRESS, CREATOR_HUB_ABI, LIGHTHOUSE_API_KEY, USDC_SEPOLIA_ADDRESS } from '@/config/constants';
-import lighthouse from '@lighthouse-web3/sdk';
+// Lighthouse SDK removed — using direct API calls to avoid browser hanging issues
 import { parseUnits } from 'viem';
 import * as Tabs from '@radix-ui/react-tabs';
 import { useRouter } from 'next/navigation';
@@ -46,14 +46,15 @@ export default function UploadPage() {
         }
     });
 
-    // Debug: Validate Lighthouse API Key
+    // Debug: Validate Lighthouse API Key via direct API call
     useEffect(() => {
         const validateKey = async () => {
             if (!LIGHTHOUSE_API_KEY) return;
             try {
                 console.log('Validating Lighthouse Key:', LIGHTHOUSE_API_KEY.substring(0, 6) + '...');
-                const balance = await lighthouse.getBalance(LIGHTHOUSE_API_KEY);
-                console.log('Lighthouse Key Valid. Balance:', balance);
+                const res = await fetch(`https://api.lighthouse.storage/api/auth/get_balance?apiKey=${LIGHTHOUSE_API_KEY}`);
+                const data = await res.json();
+                console.log('Lighthouse Key Valid. Balance:', data);
             } catch (e) {
                 console.error('Lighthouse Key Validation Failed:', e);
             }
@@ -119,26 +120,47 @@ export default function UploadPage() {
     const { handlePayment, paymentState } = useX402();
     // ...
 
-    const uploadToIPFS = async (
+    // Direct XHR upload to Lighthouse REST API — bypasses SDK browser issues
+    const uploadToIPFS = (
         file: File,
         label: 'video' | 'cover' | 'metadata',
         onPercent?: (pct: number) => void
     ): Promise<string> => {
-        const progressCallback = (progressData: any) => {
-            if (progressData?.total && onPercent) {
-                const pct = Math.round((progressData.uploaded / progressData.total) * 100);
-                onPercent(pct);
-            }
-        };
+        return new Promise((resolve, reject) => {
+            const formData = new FormData();
+            formData.append('file', file, file.name);
 
-        const output = await lighthouse.upload(
-            [file],
-            LIGHTHOUSE_API_KEY,
-            { cidVersion: 1, onProgress: progressCallback }
-        );
+            const xhr = new XMLHttpRequest();
 
-        console.log(`[Upload] ${label} → IPFS CID:`, output.data.Hash);
-        return output.data.Hash;
+            xhr.upload.addEventListener('progress', (e) => {
+                if (e.lengthComputable && onPercent) {
+                    onPercent(Math.round((e.loaded / e.total) * 100));
+                }
+            });
+
+            xhr.addEventListener('load', () => {
+                if (xhr.status >= 200 && xhr.status < 300) {
+                    try {
+                        const response = JSON.parse(xhr.responseText);
+                        const cid = response?.Hash || response?.data?.Hash || response?.cid;
+                        if (!cid) throw new Error('No CID in response: ' + xhr.responseText.slice(0, 200));
+                        console.log(`[Upload] ${label} → IPFS CID:`, cid);
+                        resolve(cid);
+                    } catch (err: any) {
+                        reject(new Error('Failed to parse upload response: ' + err.message));
+                    }
+                } else {
+                    reject(new Error(`Upload failed: HTTP ${xhr.status} — ${xhr.responseText.slice(0, 200)}`));
+                }
+            });
+
+            xhr.addEventListener('error', () => reject(new Error(`Network error uploading ${label} to IPFS`)));
+            xhr.addEventListener('abort', () => reject(new Error(`Upload aborted for ${label}`)));
+
+            xhr.open('POST', 'https://node.lighthouse.storage/api/v0/add');
+            xhr.setRequestHeader('Authorization', `Bearer ${LIGHTHOUSE_API_KEY}`);
+            xhr.send(formData);
+        });
     };
 
     const handleUpload = async () => {

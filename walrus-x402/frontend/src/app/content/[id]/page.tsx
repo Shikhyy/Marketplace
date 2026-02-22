@@ -126,6 +126,8 @@ export default function ContentPage(props: { params: Promise<{ id: string }> }) 
                             isLegacy: true
                         };
                         setAuthorized(true); // Legacy is always free
+                        // Set stream URL directly for legacy content (always public IPFS)
+                        setStreamUrl(`${GATEWAY}${match.videoCID}`);
                     }
 
                 } else {
@@ -207,8 +209,13 @@ export default function ContentPage(props: { params: Promise<{ id: string }> }) 
                             paymentToken: paymentToken
                         };
 
-                        if (isFree) setAuthorized(true);
-                        else setAuthorized(false);
+                        if (isFree) {
+                            setAuthorized(true);
+                            // Set stream URL directly for free content so it works on all devices
+                            if (metadata.video) {
+                                setStreamUrl(`${GATEWAY}${metadata.video.replace('ipfs://', '')}`);
+                            }
+                        } else setAuthorized(false);
                     }
                 }
 
@@ -329,6 +336,13 @@ export default function ContentPage(props: { params: Promise<{ id: string }> }) 
             return;
         }
 
+        // Legacy content and free content already have streamUrl set. Skip API verification.
+        const isNumericId = /^\d+$/.test(content.id);
+        if (!isNumericId || content.isLegacy || !content.isPremium) {
+            setVerifyingAccess(false);
+            return;
+        }
+
         try {
             setVerifyingAccess(true); // Start verification
             // 1. Check Local Storage "Proof of Payment"
@@ -342,13 +356,18 @@ export default function ContentPage(props: { params: Promise<{ id: string }> }) 
                     // Legacy format (no timestamp) -> STRICT: Treated as Expired
                     paymentProof = null;
                 } else if (rentalEntry.txHash && rentalEntry.timestamp) {
-                    // New format with timestamp: Check strict 24h expiry
-                    const now = Date.now();
-                    const rentDuration = 24 * 60 * 60 * 1000; // 24 hours
-                    if (now - rentalEntry.timestamp < rentDuration) {
+                    if (rentalEntry.type === 'buy') {
+                        // Permanent purchase — always valid, no expiry
                         paymentProof = rentalEntry.txHash;
+                    } else {
+                        // Rental — 24h window
+                        const now = Date.now();
+                        const rentDuration = 24 * 60 * 60 * 1000; // 24 hours
+                        if (now - rentalEntry.timestamp < rentDuration) {
+                            paymentProof = rentalEntry.txHash;
+                        }
+                        // Else: Expired locally, no proof used
                     }
-                    // Else: Expired locally, no proof used
                 }
             }
 
@@ -447,10 +466,14 @@ export default function ContentPage(props: { params: Promise<{ id: string }> }) 
             if (txHash) {
                 console.log("[Payment] Success:", txHash);
 
-                // Save Proof to Local Storage
+                // Save Proof to Local Storage — include purchaseType so expiry logic knows
                 const storageKey = `rentals_${user?.wallet?.address}`;
                 const currentRentals = JSON.parse(localStorage.getItem(storageKey) || '{}');
-                currentRentals[content.id] = { txHash, timestamp: Date.now() };
+                currentRentals[content.id] = {
+                    txHash,
+                    timestamp: Date.now(),
+                    type: purchaseType, // 'rent' | 'buy'
+                };
                 localStorage.setItem(storageKey, JSON.stringify(currentRentals));
 
                 toast.success("Payment successful! Access granted.");

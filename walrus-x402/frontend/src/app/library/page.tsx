@@ -18,8 +18,9 @@ interface ContentItem {
     creatorAddress: string;
     type: string;
     timestamp: number;
-    expiry?: number; // Rental expiry
-    isRental: boolean;
+    expiry?: number; // Rental expiry (0 = permanent)
+    isRental: boolean;  // true = 24h rent, false = permanent buy or subscription
+    isPurchased: boolean; // true = outright buy (permanent)
 }
 
 export default function LibraryPage() {
@@ -72,21 +73,27 @@ export default function LibraryPage() {
 
                         // A. Check Local Storage First (Direct Payments)
                         const rentalEntry = storedRentals[contentId];
+                        let isPurchased = false;
                         if (rentalEntry) {
                             if (typeof rentalEntry === 'string') {
-                                // Legacy format: No timestamp available. 
-                                // STRICT MODE: Treat as Expired.
+                                // Legacy format: treat as expired
                                 isRented = false;
                             } else if (rentalEntry.timestamp) {
-                                // New format with timestamp
-                                const now = Date.now();
-                                const rentDuration = 24 * 60 * 60 * 1000; // 24 hours
-                                if (now - rentalEntry.timestamp < rentDuration) {
+                                if (rentalEntry.type === 'buy') {
+                                    // Permanent purchase — always valid
                                     isRented = true;
-                                    expiryTimestamp = Math.floor((rentalEntry.timestamp + rentDuration) / 1000);
+                                    isPurchased = true;
+                                    expiryTimestamp = 0; // no expiry
                                 } else {
-                                    // Expired locally
-                                    isRented = false;
+                                    // Rental — 24h window
+                                    const now = Date.now();
+                                    const rentDuration = 24 * 60 * 60 * 1000;
+                                    if (now - rentalEntry.timestamp < rentDuration) {
+                                        isRented = true;
+                                        expiryTimestamp = Math.floor((rentalEntry.timestamp + rentDuration) / 1000);
+                                    } else {
+                                        isRented = false;
+                                    }
                                 }
                             }
                         }
@@ -149,7 +156,8 @@ export default function LibraryPage() {
                                     type: meta.contentType || 'video',
                                     timestamp: meta.createdAt || Date.now(),
                                     expiry: expiryTimestamp,
-                                    isRental: isRented as boolean
+                                    isRental: isRented && !isPurchased,
+                                    isPurchased,
                                 } as ContentItem;
                             } catch (e) {
                                 console.error("Metadata error", e);
@@ -167,6 +175,9 @@ export default function LibraryPage() {
 
                 const founded = results.filter((item) => {
                     if (!item) return false;
+                    // Permanent purchases never expire from the library
+                    if (item.isPurchased) return true;
+                    // Rentals: filter out if past 24h window
                     if (item.isRental && item.expiry && item.expiry < Date.now() / 1000) {
                         return false;
                     }
@@ -245,13 +256,18 @@ export default function LibraryPage() {
 
                                     {/* Badges */}
                                     <div className="absolute top-3 left-3 flex gap-2">
-                                        <span className={`px-2 py-0.5 rounded text-[10px] font-bold uppercase tracking-wider border backdrop-blur-md ${item.isRental ? 'bg-amber-500/20 border-amber-500/30 text-amber-300' : 'bg-purple-500/20 border-purple-500/30 text-purple-300'
+                                        <span className={`px-2 py-0.5 rounded text-[10px] font-bold uppercase tracking-wider border backdrop-blur-md ${item.isPurchased
+                                                ? 'bg-emerald-500/20 border-emerald-500/30 text-emerald-300'
+                                                : item.isRental
+                                                    ? 'bg-amber-500/20 border-amber-500/30 text-amber-300'
+                                                    : 'bg-purple-500/20 border-purple-500/30 text-purple-300'
                                             }`}>
-                                            {item.isRental ? 'Rental' : 'Subscriber'}
+                                            {item.isPurchased ? 'Owned' : item.isRental ? 'Rental' : 'Subscriber'}
                                         </span>
                                     </div>
 
-                                    {item.isRental && item.expiry && item.expiry > Date.now() / 1000 && (
+                                    {/* Rental countdown — only for time-limited rentals */}
+                                    {item.isRental && !item.isPurchased && item.expiry && item.expiry > Date.now() / 1000 && (
                                         <div className="absolute bottom-3 right-3 bg-black/80 backdrop-blur-md text-xs font-bold px-2.5 py-1 rounded-full text-amber-400 border border-amber-500/30 flex items-center gap-1.5 shadow-lg">
                                             <Clock className="w-3 h-3" />
                                             {`${Math.ceil((item.expiry - Date.now() / 1000) / 3600)}h left`}

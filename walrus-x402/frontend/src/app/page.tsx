@@ -77,7 +77,7 @@ export default function Home() {
       colSpan: 2 as const,
       content: (
         <div className="mt-8 p-6 rounded-2xl bg-black/40 border border-white/5 relative overflow-hidden h-64 flex items-center justify-center group-hover:border-cyan-500/30 transition-colors w-full">
-          <div className="absolute inset-0 bg-[url('https://beebom.com/wp-content/uploads/2021/11/Web-3.0-architecture.jpg?w=640')] bg-cover opacity-20 bg-center" />
+          <div className="absolute inset-0 bg-[radial-gradient(ellipse_at_top_left,rgba(34,211,238,0.15),transparent_60%),radial-gradient(ellipse_at_bottom_right,rgba(99,102,241,0.15),transparent_60%)]" />
           <div className="relative z-10 text-cyan-400 font-mono text-sm flex items-center gap-2 px-4 py-2 rounded-full bg-black/50 border border-cyan-500/30 backdrop-blur-md">
             <span className="w-2 h-2 rounded-full bg-cyan-500 animate-pulse" />
             storage://lighthouse_node_01

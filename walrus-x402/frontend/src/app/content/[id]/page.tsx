@@ -344,70 +344,59 @@ export default function ContentPage(props: { params: Promise<{ id: string }> }) 
         }
 
         try {
-            setVerifyingAccess(true); // Start verification
-            // 1. Check Local Storage "Proof of Payment"
+            setVerifyingAccess(true);
+
+            // 1. Check Local Storage proof (rentals + buys)
             const storageKeyRentals = `rentals_${user?.wallet?.address}`;
             const storedRentals = JSON.parse(localStorage.getItem(storageKeyRentals) || '{}');
             const rentalEntry = storedRentals[content.id];
 
-            let paymentProof = null;
-            if (rentalEntry) {
-                if (typeof rentalEntry === 'string') {
-                    // Legacy format (no timestamp) -> STRICT: Treated as Expired
-                    paymentProof = null;
-                } else if (rentalEntry.txHash && rentalEntry.timestamp) {
-                    if (rentalEntry.type === 'buy') {
-                        // Permanent purchase — always valid, no expiry
+            let paymentProof: string | null = null;
+            if (rentalEntry && typeof rentalEntry !== 'string' && rentalEntry.txHash && rentalEntry.timestamp) {
+                if (rentalEntry.type === 'buy') {
+                    // Permanent purchase — always valid
+                    paymentProof = rentalEntry.txHash;
+                } else {
+                    // Rental — 24h window
+                    if (Date.now() - rentalEntry.timestamp < 24 * 60 * 60 * 1000) {
                         paymentProof = rentalEntry.txHash;
-                    } else {
-                        // Rental — 24h window
-                        const now = Date.now();
-                        const rentDuration = 24 * 60 * 60 * 1000; // 24 hours
-                        if (now - rentalEntry.timestamp < rentDuration) {
-                            paymentProof = rentalEntry.txHash;
-                        }
-                        // Else: Expired locally, no proof used
                     }
                 }
             }
 
-            // Check Subscription (Not fully supported on P2P backend yet unless we index it, 
-            // but we will send the sub tx hash if found. Backend only verifies generic 'txHash')
+            // 2. Check subscription proof
             if (!paymentProof) {
                 const storageKeySubs = `subscriptions_${user?.wallet?.address}`;
                 const storedSubs = JSON.parse(localStorage.getItem(storageKeySubs) || '{}');
-                const subProof = storedSubs[content.creatorAddress.toLowerCase()]; // { txHash, timestamp }
-                if (subProof) {
-                    // Check expiry (30 days)
-                    if (Date.now() - subProof.timestamp < 30 * 24 * 60 * 60 * 1000) {
-                        paymentProof = subProof.hash || subProof.txHash; // Handle both formats if flexible
-                    }
+                const subProof = storedSubs[content.creatorAddress.toLowerCase()];
+                if (subProof && Date.now() - subProof.timestamp < 30 * 24 * 60 * 60 * 1000) {
+                    paymentProof = subProof.hash || subProof.txHash;
                 }
             }
 
+            // 3. If we have a valid local proof, grant access DIRECTLY — no API call needed.
+            //    The API's verifyP2PPayment checks payment to the contract address, but our
+            //    payments go directly to the creator (recipient mismatch → always 402 on refresh).
+            //    The stream URL is just GATEWAY + videoCID, which we already have.
+            if (paymentProof && content.videoCID) {
+                setStreamUrl(`${GATEWAY}${content.videoCID}`);
+                setAuthorized(true);
+                return;
+            }
 
-            // Even if no proof, call it to see if it's Free (402 check)
-            const headers: any = {};
-            if (paymentProof) headers['X-PAYMENT'] = paymentProof;
-
-            const res = await fetch(`/api/video/${content.id}`, {
-                headers: headers
-            });
-
+            // 4. No local proof — call the API (handles free content & on-chain subscription)
+            const res = await fetch(`/api/video/${content.id}`);
             if (res.ok) {
-                // API redirects or returns 200 with content
                 setStreamUrl(res.url);
                 setAuthorized(true);
             } else if (res.status === 402) {
-                const data = await res.json();
-                console.log("[Access] Payment Required:", data);
                 setAuthorized(false);
             } else {
-                console.warn("[Access] API Error:", res.status);
+                console.warn('[Access] API Error:', res.status);
             }
 
         } catch (e) {
-            console.error("Access verification failed", e);
+            console.error('Access verification failed', e);
         } finally {
             setVerifyingAccess(false);
         }

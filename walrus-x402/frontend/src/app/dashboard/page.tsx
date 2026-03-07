@@ -72,6 +72,31 @@ export default function DashboardPage() {
         }
     };
 
+    // Filter My Content — include INACTIVE so creator can delete duplicates
+    const myContent = allContent
+        ? (allContent as any[]).filter((c: any) => c.creatorAddress === address)
+        : [];
+
+    // Fetch titles from IPFS metadata for each content item
+    useEffect(() => {
+        if (!myContent.length) return;
+        const GATEWAY = NEXT_PUBLIC_IPFS_GATEWAY;
+        myContent.forEach(async (item: any) => {
+            const key = item.id.toString();
+            if (contentTitles[key]) return; // already loaded
+            try {
+                const res = await fetch(GATEWAY + item.metadataURI.replace('ipfs://', ''));
+                if (res.ok) {
+                    const meta = await res.json();
+                    setContentTitles(prev => ({ ...prev, [key]: meta.title || `Content #${key}` }));
+                }
+            } catch {
+                setContentTitles(prev => ({ ...prev, [key]: `Content #${key}` }));
+            }
+        });
+        // eslint-disable-next-line react-hooks/exhaustive-deps
+    }, [allContent]);
+
     if (!isClient) return null;
 
     if (!isConnected) {
@@ -116,30 +141,7 @@ export default function DashboardPage() {
     const subscriberCount = (creatorData as any)[4];
     const totalEarnings = (creatorData as any)[5];
 
-    // Filter My Content — include INACTIVE so creator can delete duplicates
-    const myContent = allContent
-        ? (allContent as any[]).filter((c: any) => c.creatorAddress === address)
-        : [];
 
-    // Fetch titles from IPFS metadata for each content item
-    useEffect(() => {
-        if (!myContent.length) return;
-        const GATEWAY = NEXT_PUBLIC_IPFS_GATEWAY;
-        myContent.forEach(async (item: any) => {
-            const key = item.id.toString();
-            if (contentTitles[key]) return; // already loaded
-            try {
-                const res = await fetch(GATEWAY + item.metadataURI.replace('ipfs://', ''));
-                if (res.ok) {
-                    const meta = await res.json();
-                    setContentTitles(prev => ({ ...prev, [key]: meta.title || `Content #${key}` }));
-                }
-            } catch {
-                setContentTitles(prev => ({ ...prev, [key]: `Content #${key}` }));
-            }
-        });
-        // eslint-disable-next-line react-hooks/exhaustive-deps
-    }, [allContent]);
 
     return (
         <div className="min-h-screen pt-24 pb-20 px-6 md:px-12 max-w-7xl mx-auto space-y-12">

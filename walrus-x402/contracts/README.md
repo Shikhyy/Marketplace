@@ -1,3 +1,9 @@
+# ⛓️ Content Hub Smart Contracts
+
+Please see the [Main Project README](../README.md) in the root of the repository for full documentation and architecture details.
+
+---
+
 ## Foundry
 
 **Foundry is a blazing fast, portable and modular toolkit for Ethereum application development written in Rust.**
